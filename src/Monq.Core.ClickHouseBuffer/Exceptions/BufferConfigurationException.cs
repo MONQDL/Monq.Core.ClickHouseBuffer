@@ -3,7 +3,7 @@ using System.Runtime.Serialization;
 
 namespace Monq.Core.ClickHouseBuffer.Exceptions
 {
-    public sealed class BufferConfigurationException: Exception
+    public class BufferConfigurationException: Exception
     {
         /// <summary>Initializes a new instance of the <see cref="BufferConfigurationException" /> class.</summary>
         public BufferConfigurationException()

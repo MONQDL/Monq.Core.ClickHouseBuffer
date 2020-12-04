@@ -1,7 +1,7 @@
 include:
   - project: 'smon.monq.ru/devops/devops-files'
-    ref: master
+    ref: feature/net5.0
     file: "/gitlab-ci-yaml/src/.NET Core Library/gitlab-ci-body.yaml"
   - project: 'smon.monq.ru/devops/devops-files'
-    ref: master
+    ref: feature/net5.0
     file: "/gitlab-ci-yaml/src/.NET Core Library/gitlab-ci-scripts.yaml"

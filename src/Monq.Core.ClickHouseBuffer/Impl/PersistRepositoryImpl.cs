@@ -16,7 +16,6 @@ namespace Monq.Core.ClickHouseBuffer.Impl
         /// Инициализирует новый экземпляр класса <see cref="DefaultRepository" />.
         /// </summary>
         /// <param name="engineOptions">Конфигурация ClickHouse.</param>
-        /// <param name="logger">The logger.</param>
         public DefaultRepository(
             IOptions<EngineOptions> engineOptions) : base(engineOptions)
         {
