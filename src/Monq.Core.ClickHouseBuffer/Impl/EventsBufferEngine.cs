@@ -68,7 +68,7 @@ namespace Monq.Core.ClickHouseBuffer.Impl
             }
         }
 
-        async Task FlushTimerDelegate(object _)
+        async Task FlushTimerDelegate(object? _)
         {
             await _semaphore.WaitAsync();
             try

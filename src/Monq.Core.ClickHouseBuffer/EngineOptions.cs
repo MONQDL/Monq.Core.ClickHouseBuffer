@@ -20,12 +20,12 @@
         /// <summary>
         /// Строка подключения в ClickHouse.
         /// </summary>
-        public string ConnectionString { get; set; }
+        public string? ConnectionString { get; set; }
 
         /// <summary>
         /// Название таблицы ClickHouse для записи.
         /// </summary>
-        public string TableName { get; set; }
+        public string? TableName { get; set; }
 
         /// <summary>
         /// Maximum number of threads that will be used to write data to the database.

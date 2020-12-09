@@ -13,7 +13,6 @@ namespace Monq.Core.ClickHouseBuffer
         /// </summary>
         /// <param name="columns">The columns.</param>
         /// <param name="values">The values.</param>
-        /// <param name="eventsFlushCount">The events flush count.</param>
         /// <returns></returns>
         Task WriteBatch(IReadOnlyCollection<string> columns, List<object[]> values);
     }

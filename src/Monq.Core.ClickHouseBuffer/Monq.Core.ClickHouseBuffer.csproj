@@ -12,6 +12,7 @@
     <PackageTags>clickhouse;clickhouse buffer</PackageTags>
     <PackageProjectUrl>https://gitlab.monq.ru/smon.monq.ru/libraries/Monq.Core.ClickHouseBuffer</PackageProjectUrl>
     <Description>The Clickhouse buffer can collect and write rows with batches (time based or count based).</Description>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
