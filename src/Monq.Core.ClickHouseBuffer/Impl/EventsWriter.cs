@@ -1,4 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
+using Monq.Core.ClickHouseBuffer.Exceptions;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -29,12 +31,8 @@ namespace Monq.Core.ClickHouseBuffer.Impl
             _logger = logger;
         }
 
-        /// <summary>
-        /// Записать события в БД.
-        /// </summary>
-        /// <param name="dbValues">Массив словарей значений колонок таблицы потоковых данных.</param>
-        /// <returns><see cref="Task"/>, показывающий завершение операции.</returns>
-        public async Task Write(IDictionary<string, object>[] dbValues)
+        /// <inheritdoc />
+        public async Task Write(IDictionary<string, object>[] dbValues, string tableName)
         {
             if (dbValues.Length == 0)
                 return;
@@ -47,7 +45,14 @@ namespace Monq.Core.ClickHouseBuffer.Impl
             var columns = dbValues[0].Keys.Select(val => $"`{val}`").ToList() as IReadOnlyCollection<string>;
             var values = dbValues.Select(val => val.Values.ToArray()).ToList();
 
-            await _persistRepository.WriteBatch(columns, values);
+            try
+            {
+                await _persistRepository.WriteBatch(columns, values, tableName);
+            }
+            catch(Exception e)
+            {
+                throw new PersistingException("Error while persisting data", dbValues, tableName, e);
+            }
 
             sw.Stop();
 

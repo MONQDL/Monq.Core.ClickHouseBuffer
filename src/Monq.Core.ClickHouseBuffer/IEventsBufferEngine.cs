@@ -12,7 +12,8 @@ namespace Monq.Core.ClickHouseBuffer
         /// Добавить событие для записи в ClickHouse.
         /// </summary>
         /// <param name="message">Объект, который требуется записать в ClickHouse.</param>
+        /// <param name="tableName">Название таблицы, в которую требуется записать событие.</param>
         /// <returns><see cref="Task"/>, показывающий завершение операции.</returns>
-        Task AddEvent(T message);
+        Task AddEvent(T message, string tableName);
     }
 }

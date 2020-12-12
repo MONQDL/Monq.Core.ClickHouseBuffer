@@ -13,7 +13,8 @@ namespace Monq.Core.ClickHouseBuffer
         /// </summary>
         /// <param name="columns">The columns.</param>
         /// <param name="values">The values.</param>
+        /// <param name="tableName">The table name in whitch records will be inserted.</param>
         /// <returns></returns>
-        Task WriteBatch(IReadOnlyCollection<string> columns, List<object[]> values);
+        Task WriteBatch(IReadOnlyCollection<string> columns, List<object[]> values, string tableName);
     }
 }

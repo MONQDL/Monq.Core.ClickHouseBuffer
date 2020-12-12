@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Monq.Core.ClickHouseBuffer.Exceptions;
 using Monq.Core.ClickHouseBuffer.Extensions;
 using Newtonsoft.Json;
 using System;
@@ -19,7 +20,7 @@ namespace Monq.Core.ClickHouseBuffer.Impl
 #pragma warning disable IDE0052 // Удалить непрочитанные закрытые члены
         readonly Timer _flushTimer;
 #pragma warning restore IDE0052 // Удалить непрочитанные закрытые члены
-        readonly List<T> _events = new List<T>();
+        readonly List<EventItem<T>> _events = new List<EventItem<T>>();
         readonly IEventsWriter _eventsWriter;
         readonly EngineOptions _engineOptions;
         readonly ILogger<EventsBufferEngine<T>> _logger;
@@ -50,13 +51,13 @@ namespace Monq.Core.ClickHouseBuffer.Impl
         }
 
         /// <inheritdoc />
-        public async Task AddEvent(T webTaskResultEvent)
+        public async Task AddEvent(T webTaskResultEvent, string tableName)
         {
             await _semaphore.WaitAsync();
 
             try
             {
-                _events.Add(webTaskResultEvent);
+                _events.Add(new EventItem<T>(webTaskResultEvent, tableName));
                 if (_events.Count < _engineOptions.EventsFlushCount)
                     return;
 
@@ -92,24 +93,43 @@ namespace Monq.Core.ClickHouseBuffer.Impl
             return HandleEvents(eventsCache);
         }
 
-        async Task HandleEvents(IEnumerable<T> streamDataEvents)
+        async Task HandleEvents(IEnumerable<EventItem<T>> streamDataEvents)
         {
-            var dbValues = streamDataEvents.Select(val => val.CreateDbValues(true)).ToArray();
+            var tableGroups = streamDataEvents.GroupBy(x => x.TableName);
 
+            var tasks = new List<Task>();
+
+            foreach (var tableGroup in tableGroups)
+            {
+                var dbValues = streamDataEvents.Select(val => val.CreateDbValues(true)).ToArray();
+                tasks.Add(_eventsWriter.Write(dbValues, tableGroup.Key));
+            }
             try
             {
-                await _eventsWriter.Write(dbValues);
+                await Task.WhenAll(tasks);
             }
             catch (Exception e)
             {
                 _logger.LogError(e, "Error while trying to write batch of data to Storage.");
-                var extendedError = string.Join(Environment.NewLine, new[]
+
+                var exceptions = tasks
+                    .Where(t => t.Exception != null)
+                    .Select(t => t.Exception)
+                    .ToList();
+                foreach (var aggregateException in exceptions)
                 {
-                    "Источник:",
-                    JsonConvert.SerializeObject(dbValues, Formatting.Indented)
-                });
-                _logger.LogDebug(extendedError);
-                // Незаписанные события не отправляем никуда. Для текущей реализации это не смертельно.
+                    var persistException = aggregateException?.InnerExceptions?.First() as PersistingException;
+                    if (persistException != null)
+                    {
+                        var extendedError = string.Join(Environment.NewLine, new[]
+                        {
+                            $"Table: {persistException.TableName}. Source: ", 
+                                JsonConvert.SerializeObject(persistException.DbValues, Formatting.Indented)
+                        });
+                        _logger.LogDebug(extendedError);
+                    }
+                    // Незаписанные события не отправляем никуда. Для текущей реализации это не смертельно.
+                }
             }
         }
 

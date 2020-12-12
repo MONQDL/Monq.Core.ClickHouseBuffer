@@ -1,6 +1,5 @@
 ﻿using ClickHouse.Client.Copy;
 using Microsoft.Extensions.Options;
-using Monq.Core.ClickHouseBuffer.Exceptions;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -18,13 +17,10 @@ namespace Monq.Core.ClickHouseBuffer.Impl
         /// <param name="engineOptions">Конфигурация ClickHouse.</param>
         public DefaultRepository(
             IOptions<EngineOptions> engineOptions) : base(engineOptions)
-        {
-            if (string.IsNullOrEmpty(engineOptions.Value.TableName))
-                throw new BufferConfigurationException($"{nameof(engineOptions.Value.TableName)} is null.");
-        }
+        { }
 
         /// <inheritdoc />
-        public async Task WriteBatch(IReadOnlyCollection<string> columns, List<object[]> values)
+        public async Task WriteBatch(IReadOnlyCollection<string> columns, List<object[]> values, string tableName)
         {
             await using var connection = GetConnection();
 
@@ -32,7 +28,7 @@ namespace Monq.Core.ClickHouseBuffer.Impl
             {
                 MaxDegreeOfParallelism = Options.MaxDegreeOfParallelism,
                 BatchSize = Options.EventsFlushCount,
-                DestinationTableName = connection.Database + "." + Options.TableName
+                DestinationTableName = connection.Database + "." + tableName
             };
             await command.WriteToServerAsync(values, columns);
         }

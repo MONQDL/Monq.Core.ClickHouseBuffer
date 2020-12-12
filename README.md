@@ -41,7 +41,6 @@ Host=clickhouse<-http-host>;Port=80;Username=<user>;Password=<password>;Database
 {
 	"EventsFlushPeriodSec": 2,
 	"EventsFlushCount": 500,
-	"TableName": "clickHouseTable",
 	"MaxDegreeOfParallelism": 1
 }
 ```
@@ -108,7 +107,7 @@ namespace FooProcessor.Buffer.QueueHandlers
             if (message is null)
                 return Task.CompletedTask;
 
-            return _eventsBufferEngine.AddEvent(message);
+            return _eventsBufferEngine.AddEvent(message, "clickHouseTable");
         }
     }
 }
