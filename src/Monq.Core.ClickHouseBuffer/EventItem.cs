@@ -1,18 +1,18 @@
 ﻿namespace Monq.Core.ClickHouseBuffer
 {
-    public struct EventItem<T>
+    public struct EventItem
     {
         /// <summary>
         /// Событие, которое требуется записать в БД.
         /// </summary>
-        public T Event { get; }
+        public object Event { get; }
 
         /// <summary>
         /// Название таблицы, в которую требуется записать событие.
         /// </summary>
         public string TableName { get; }
 
-        public EventItem(T @event, string tableName)
+        public EventItem(object @event, string tableName)
         {
             Event = @event;
             TableName = tableName;

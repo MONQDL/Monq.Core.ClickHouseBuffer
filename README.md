@@ -24,7 +24,7 @@ Install-Package RabbitMQCoreClient -Source http://nuget.monq.ru/nuget/Default
 В Program.cs для консольных приложений или в Startup.cs для asp.net требуется добавить метод конфигурации буфера.
 
 ```csharp
-services.ConfigureCHBuffer<FooEntity>(Configuration.GetSection(BufferEngineOptions), clickHouseConnectionString);
+services.ConfigureCHBuffer(Configuration.GetSection(BufferEngineOptions), clickHouseConnectionString);
 ```
 
 `clickHouseConnectionString` - срока вида
@@ -56,7 +56,7 @@ Host=clickhouse<-http-host>;Port=80;Username=<user>;Password=<password>;Database
 
     var clickHouseConnectionString = hostContext.Configuration["ClickHouseConnectionString"];
 
-    services.ConfigureCHBuffer<FooEntity>(
+    services.ConfigureCHBuffer(
         hostContext.Configuration.GetSection("BufferEngineOptions"), clickHouseConnectionString);
 
     services
@@ -125,7 +125,7 @@ namespace FooProcessor.Buffer.QueueHandlers
 .ConfigureServices((hostContext, services) =>
 {
     ...
-    services.ConfigureCHBuffer<FooEntity>(
+    services.ConfigureCHBuffer(
         hostContext.Configuration.GetSection("BufferEngineOptions"), clickHouseConnectionString);
 
     services.AddTransient<IPersistRepository, MyPersistRepositoryImpl>();

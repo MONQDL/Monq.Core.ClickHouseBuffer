@@ -14,27 +14,26 @@ namespace Monq.Core.ClickHouseBuffer.Impl
     /// <summary>
     /// Реализация буфера хранилища событий потоковых данных.
     /// </summary>
-    public sealed class EventsBufferEngine<T> : IEventsBufferEngine<T>, IDisposable
-        where T : class
+    public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
     {
 #pragma warning disable IDE0052 // Удалить непрочитанные закрытые члены
         readonly Timer _flushTimer;
 #pragma warning restore IDE0052 // Удалить непрочитанные закрытые члены
-        readonly List<EventItem<T>> _events = new List<EventItem<T>>();
+        readonly List<EventItem> _events = new List<EventItem>();
         readonly IEventsWriter _eventsWriter;
         readonly EngineOptions _engineOptions;
-        readonly ILogger<EventsBufferEngine<T>> _logger;
+        readonly ILogger<EventsBufferEngine> _logger;
 
         static readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
 
         /// <summary>
         /// Конструктор реализации буфера хранилища событий.
-        /// Создаёт новый экземпляр класса <see cref="EventsBufferEngine{T}"/>.
+        /// Создаёт новый экземпляр класса <see cref="EventsBufferEngine"/>.
         /// </summary>
         public EventsBufferEngine(
             IOptions<EngineOptions> engineOptions,
             IEventsWriter eventsWriter,
-            ILogger<EventsBufferEngine<T>> logger)
+            ILogger<EventsBufferEngine> logger)
         {
             if (engineOptions == null)
                 throw new ArgumentNullException(nameof(engineOptions), $"{nameof(engineOptions)} is null.");
@@ -51,13 +50,13 @@ namespace Monq.Core.ClickHouseBuffer.Impl
         }
 
         /// <inheritdoc />
-        public async Task AddEvent(T webTaskResultEvent, string tableName)
+        public async Task AddEvent(object webTaskResultEvent, string tableName)
         {
             await _semaphore.WaitAsync();
 
             try
             {
-                _events.Add(new EventItem<T>(webTaskResultEvent, tableName));
+                _events.Add(new EventItem(webTaskResultEvent, tableName));
                 if (_events.Count < _engineOptions.EventsFlushCount)
                     return;
 
@@ -93,7 +92,7 @@ namespace Monq.Core.ClickHouseBuffer.Impl
             return HandleEvents(eventsCache);
         }
 
-        async Task HandleEvents(IEnumerable<EventItem<T>> streamDataEvents)
+        async Task HandleEvents(IEnumerable<EventItem> streamDataEvents)
         {
             var tableGroups = streamDataEvents.GroupBy(x => x.TableName);
 
