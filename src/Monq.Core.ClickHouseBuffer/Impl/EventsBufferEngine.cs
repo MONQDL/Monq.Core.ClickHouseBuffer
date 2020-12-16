@@ -100,7 +100,7 @@ namespace Monq.Core.ClickHouseBuffer.Impl
 
             foreach (var tableGroup in tableGroups)
             {
-                var dbValues = streamDataEvents.Select(val => val.CreateDbValues(true)).ToArray();
+                var dbValues = tableGroup.Select(val => val.Event.CreateDbValues(true)).ToArray();
                 tasks.Add(_eventsWriter.Write(dbValues, tableGroup.Key));
             }
             try
