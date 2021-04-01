@@ -1,0 +1,71 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Reflection;
+
+namespace Monq.Core.ClickHouseBuffer.Extensions
+{
+    public static class ClickHouseBulkModelExtensions
+    {
+        /// <summary>
+        /// Сформировать массив колонок и их значений для записи в БД.
+        /// </summary>
+        /// <param name="obj">Результат выполенния проверки.</param>
+        /// <param name="useCamelCase"></param>
+        /// <returns></returns>
+        public static IDictionary<string, object> CreateDbValues(this object? obj, bool useCamelCase = true)
+        {
+            var result = new Dictionary<string, object>();
+            if (obj is null)
+                return result;
+
+            var objType = obj.GetType();
+            foreach (var prop in objType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                var colName = useCamelCase ? prop.Name.ToCamelCase() : prop.Name;
+                var value = prop.GetValue(obj);
+                if (prop.PropertyType.IsEnum)
+                {
+                    if (value is null)
+                    {
+                        var enumValues = Enum.GetValues(prop.PropertyType);
+                        if (enumValues != null && enumValues.GetValue(0) != null)
+                            value = Enum.ToObject(prop.PropertyType, enumValues!.GetValue(0)!).ToString();
+                        else
+                            value = null;
+                    }
+                    else
+                        value = Enum.ToObject(prop.PropertyType, value).ToString();
+                }
+                else if (prop.PropertyType == typeof(DateTimeOffset))
+                {
+                    if (value is null)
+                        value = default(DateTimeOffset).UtcDateTime;
+                    else
+                        value = ((DateTimeOffset)value).UtcDateTime;
+                }
+
+                if (value is null)
+                    value = GetDefaultValue(prop);
+
+                if (value != null)
+                    result.Add(colName, value);
+            }
+
+            return result;
+        }
+
+        static object? GetDefaultValue(PropertyInfo prop)
+        {
+            if (prop.PropertyType == typeof(string))
+                return (object)string.Empty;
+
+            var defaultAttr = prop.GetCustomAttribute(typeof(DefaultValueAttribute));
+            if (defaultAttr != null)
+                return (defaultAttr as DefaultValueAttribute)?.Value;
+
+            var propertyType = prop.PropertyType;
+            return propertyType.IsValueType ? Activator.CreateInstance(propertyType) : null;
+        }
+    }
+}
