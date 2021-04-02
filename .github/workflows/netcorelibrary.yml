@@ -34,13 +34,13 @@ jobs:
         run: dotnet build -c Release --no-restore
       - name: Test
         run: 
-          dotnet add $TEST_MAINAPP_ASP_PROJECT_PATH package coverlet.msbuild --version ${coverletMsbuildVersion:-3.0.3} > /dev/null 2>&1 
+          dotnet add $TEST_MAINAPP_ASP_PROJECT_PATH package coverlet.msbuild --version ${coverletMsbuildVersion:-3.0.3} > /dev/null 2>&1 &&
           dotnet test $TEST_MAINAPP_ASP_PROJECT_PATH -c Release --no-build --no-restore /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput=../../build_report/opencover.xml
       - name: Pack
         run: dotnet pack -c Release --no-restore ${_ASP_PROJECT_PATH} -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg
       - name: Publish
         run: 
-          dotnet nuget push $MAINAPP_ASP_PROJECT_PATH/bin/Release/*.nupkg -k $NUGET_USER:$NUGET_PASSWORD
+          dotnet nuget push $MAINAPP_ASP_PROJECT_PATH/bin/Release/*.nupkg -k $NUGET_USER:$NUGET_PASSWORD &&
           dotnet nuget push $MAINAPP_ASP_PROJECT_PATH/bin/Release/*.snupkg -k $NUGET_USER:$NUGET_PASSWORD
         env:
           NUGET_USER: ${{ secrets.GITHUB_NUGET_USER }}
