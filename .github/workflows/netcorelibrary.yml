@@ -33,15 +33,32 @@ jobs:
       - name: Build
         run: dotnet build -c Release --no-restore
       - name: Test
-        run:
-          dotnet add $TEST_MAINAPP_ASP_PROJECT_PATH package coverlet.msbuild --version ${coverletMsbuildVersion:-3.0.3} > /dev/null 2>&1 &&
+        run: |
+          dotnet add $TEST_MAINAPP_ASP_PROJECT_PATH package coverlet.msbuild --version ${coverletMsbuildVersion:-3.0.3} > /dev/null 2>&1
           dotnet test $TEST_MAINAPP_ASP_PROJECT_PATH -c Release --no-build --no-restore /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput=../../build_report/opencover.xml
       - name: Pack
         run: dotnet pack -c Release --no-restore $MAINAPP_ASP_PROJECT_PATH -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg
-      - name: Publish
+      - name: Publish Alpha
+        if: github.ref == 'refs/heads/develop'
         run:
-          dotnet nuget push $MAINAPP_ASP_PROJECT_PATH/bin/Release/*.nupkg -k $NUGET_TOKEN -s $NUGET_SERVER &&
-          dotnet nuget push $MAINAPP_ASP_PROJECT_PATH/bin/Release/*.snupkg -k $NUGET_TOKEN -s $NUGET_SERVER
+          dotnet nuget push $MAINAPP_ASP_PROJECT_PATH/bin/Release/*.nupkg -k $NUGET_TOKEN -s $NUGET_SERVER
         env:
           NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
           NUGET_SERVER: "https://api.nuget.org/v3/index.json"
+      - name: Publish Release
+        if: github.ref == 'refs/heads/master'
+        run:
+          dotnet nuget push $MAINAPP_ASP_PROJECT_PATH/bin/Release/*.nupkg --version-suffix "rev-$GITHUB_RUN_ID" -k $NUGET_TOKEN -s $NUGET_SERVER
+        env:
+          NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
+          NUGET_SERVER: "https://api.nuget.org/v3/index.json"
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_VERSION: $(cat ${MAINAPP_ASP_PROJECT_PATH}/*.csproj | grep '<Version>' | head -n 1 | awk -F '>' '{print $2;}' | awk -F '<' '{print $1;}' | sed 's/\-\*//g')
+        with:
+          tag_name: ${{ env.TAG_VERSION }}
+          draft: false
+          prerelease: false
