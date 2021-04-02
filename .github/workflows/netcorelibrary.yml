@@ -1,0 +1,47 @@
+name: NetCore-Library
+
+# Run this workflow every time a new commit pushed to your repository
+on: 
+  push:
+    # Sequence of patterns matched against refs/heads
+    branches:    
+      # Push events on main branch
+      - master
+      - develop
+
+jobs:
+  # Set the job key. The key is displayed as the job name
+  # when a job name is not provided
+  build-and-publish:
+    # Name the Job
+    name: Build and Publish Library
+    # Set the type of machine to run on
+    runs-on: ubuntu-latest
+    env:
+      MAINAPP_ASP_PROJECT_PATH: "src/Monq.Core.ClickHouseBuffer"
+      TEST_MAINAPP_ASP_PROJECT_PATH: "src/Monq.Core.ClickHouseBuffer.Tests"
+
+    steps:
+      # Checks out a copy of your repository on the ubuntu-latest machine
+      - uses: actions/checkout@v2
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: 5.0.x
+      - name: Restore dependencies
+        run: dotnet restore
+      - name: Build
+        run: dotnet build -c Release --no-restore
+      - name: Test
+        run: 
+          dotnet add $TEST_MAINAPP_ASP_PROJECT_PATH package coverlet.msbuild > /dev/null 2>&1 
+          dotnet test $TEST_MAINAPP_ASP_PROJECT_PATH -c Release --no-build --no-restore /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput=../../build_report/opencover.xml
+      - name: Pack
+        run: dotnet pack -c Release --no-restore ${_ASP_PROJECT_PATH} -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg
+      - name: Publish
+        run: 
+          dotnet nuget push $MAINAPP_ASP_PROJECT_PATH/bin/Release/*.nupkg -k $NUGET_USER:$NUGET_PASSWORD
+          dotnet nuget push $MAINAPP_ASP_PROJECT_PATH/bin/Release/*.snupkg -k $NUGET_USER:$NUGET_PASSWORD
+        env:
+          NUGET_USER: ${{ secrets.GITHUB_NUGET_USER }}
+          NUGET_PASSWORD: ${{ secrets.GITHUB_NUGET_USER }}
