@@ -36,17 +36,13 @@ jobs:
         run: |
           dotnet add $TEST_MAINAPP_ASP_PROJECT_PATH package coverlet.msbuild --version ${coverletMsbuildVersion:-3.0.3} > /dev/null 2>&1
           dotnet test $TEST_MAINAPP_ASP_PROJECT_PATH -c Release --no-build --no-restore /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput=../../build_report/opencover.xml
-      - name: Pack
-        run: dotnet pack -c Release --no-restore $MAINAPP_ASP_PROJECT_PATH -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg
-      - name: Publish Alpha
+      - name: Pack Alpha
         if: github.ref == 'refs/heads/develop'
-        run:
-          dotnet nuget push $MAINAPP_ASP_PROJECT_PATH/bin/Release/*.nupkg -k $NUGET_TOKEN -s $NUGET_SERVER --version-suffix "rev-$GITHUB_RUN_ID"
-        env:
-          NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
-          NUGET_SERVER: "https://api.nuget.org/v3/index.json"
-      - name: Publish Release
+        run: dotnet pack -c Release --no-restore $MAINAPP_ASP_PROJECT_PATH -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg --version-suffix "$VERSION_SUFFIX"
+      - name: Pack Release
         if: github.ref == 'refs/heads/master'
+        run: dotnet pack -c Release --no-restore $MAINAPP_ASP_PROJECT_PATH -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg
+      - name: Publish
         run:
           dotnet nuget push $MAINAPP_ASP_PROJECT_PATH/bin/Release/*.nupkg -k $NUGET_TOKEN -s $NUGET_SERVER
         env:
