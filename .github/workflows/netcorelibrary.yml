@@ -40,7 +40,7 @@ jobs:
         run: dotnet pack -c Release --no-restore $MAINAPP_ASP_PROJECT_PATH -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg
       - name: Publish
         run:
-          dotnet nuget push $MAINAPP_ASP_PROJECT_PATH/bin/Release/*.nupkg -ApiKey $NUGET_TOKEN &&
-          dotnet nuget push $MAINAPP_ASP_PROJECT_PATH/bin/Release/*.snupkg -ApiKey $NUGET_TOKEN
+          dotnet nuget push $MAINAPP_ASP_PROJECT_PATH/bin/Release/*.nupkg -k $NUGET_TOKEN &&
+          dotnet nuget push $MAINAPP_ASP_PROJECT_PATH/bin/Release/*.snupkg -k $NUGET_TOKEN
         env:
           $NUGET_TOKEN: ${{ secrets.GITHUB_NUGET_TOKEN }}
