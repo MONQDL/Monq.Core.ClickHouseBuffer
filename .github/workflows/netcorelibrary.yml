@@ -43,4 +43,4 @@ jobs:
           dotnet nuget push $MAINAPP_ASP_PROJECT_PATH/bin/Release/*.nupkg -ApiKey $NUGET_TOKEN &&
           dotnet nuget push $MAINAPP_ASP_PROJECT_PATH/bin/Release/*.snupkg -ApiKey $NUGET_TOKEN
         env:
-          $NUGET_TOKEN: ${{ secrets.GITHUB_$NUGET_TOKEN }}
+          $NUGET_TOKEN: ${{ secrets.GITHUB_NUGET_TOKEN }}
