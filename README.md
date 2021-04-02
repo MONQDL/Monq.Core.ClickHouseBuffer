@@ -1,5 +1,7 @@
 # Monq.Core.ClickHouseBuffer
 
+The Clickhouse buffer can collect and write rows with batches (time based or count based).
+
 Библиотека дает возможность записывать данные в ClickHouse с использование механизма буферизации.
 
 Как известно, ClickHouse выполняет вставку записываемых данных пакетным образом и если выполнять вставки по одной записи,
