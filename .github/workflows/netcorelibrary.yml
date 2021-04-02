@@ -53,6 +53,7 @@ jobs:
           NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
           NUGET_SERVER: "https://api.nuget.org/v3/index.json"
       - name: Create GitHub Release
+        if: github.ref == 'refs/heads/master'
         id: create_release
         uses: actions/create-release@latest
         env:
