@@ -41,14 +41,14 @@ jobs:
       - name: Publish Alpha
         if: github.ref == 'refs/heads/develop'
         run:
-          dotnet nuget push $MAINAPP_ASP_PROJECT_PATH/bin/Release/*.nupkg -k $NUGET_TOKEN -s $NUGET_SERVER
+          dotnet nuget push $MAINAPP_ASP_PROJECT_PATH/bin/Release/*.nupkg -k $NUGET_TOKEN -s $NUGET_SERVER --version-suffix "rev-$GITHUB_RUN_ID"
         env:
           NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
           NUGET_SERVER: "https://api.nuget.org/v3/index.json"
       - name: Publish Release
         if: github.ref == 'refs/heads/master'
         run:
-          dotnet nuget push $MAINAPP_ASP_PROJECT_PATH/bin/Release/*.nupkg --version-suffix "rev-$GITHUB_RUN_ID" -k $NUGET_TOKEN -s $NUGET_SERVER
+          dotnet nuget push $MAINAPP_ASP_PROJECT_PATH/bin/Release/*.nupkg -k $NUGET_TOKEN -s $NUGET_SERVER
         env:
           NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
           NUGET_SERVER: "https://api.nuget.org/v3/index.json"
