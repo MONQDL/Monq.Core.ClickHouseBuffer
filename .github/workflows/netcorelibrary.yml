@@ -38,7 +38,7 @@ jobs:
           dotnet test $TEST_MAINAPP_ASP_PROJECT_PATH -c Release --no-build --no-restore /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput=../../build_report/opencover.xml
       - name: Pack Alpha
         if: github.ref == 'refs/heads/develop'
-        run: dotnet pack -c Release --no-restore $MAINAPP_ASP_PROJECT_PATH -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg --version-suffix "$VERSION_SUFFIX"
+        run: dotnet pack -c Release --no-restore $MAINAPP_ASP_PROJECT_PATH -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg --version-suffix "rev-$GITHUB_RUN_ID"
       - name: Pack Release
         if: github.ref == 'refs/heads/master'
         run: dotnet pack -c Release --no-restore $MAINAPP_ASP_PROJECT_PATH -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg
