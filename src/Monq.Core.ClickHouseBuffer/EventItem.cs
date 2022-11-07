@@ -12,10 +12,16 @@
         /// </summary>
         public string TableName { get; }
 
-        public EventItem(object @event, string tableName)
+        /// <summary>
+        /// Флаг, говорящий о том, необходимо ли записывать событие в camelCase. 
+        /// </summary>
+        public bool UseCamelCase { get; set; }
+
+        public EventItem(object @event, string tableName, bool useCamelCase)
         {
             Event = @event;
             TableName = tableName;
+            UseCamelCase = useCamelCase;
         }
     }
 }

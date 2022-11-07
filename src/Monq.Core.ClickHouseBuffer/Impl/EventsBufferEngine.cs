@@ -50,13 +50,13 @@ namespace Monq.Core.ClickHouseBuffer.Impl
         }
 
         /// <inheritdoc />
-        public async Task AddEvent(object webTaskResultEvent, string tableName)
+        public async Task AddEvent(object webTaskResultEvent, string tableName, bool useCamelCase = true)
         {
             await _semaphore.WaitAsync();
 
             try
             {
-                _events.Add(new EventItem(webTaskResultEvent, tableName));
+                _events.Add(new EventItem(webTaskResultEvent, tableName, useCamelCase));
                 if (_events.Count < _engineOptions.EventsFlushCount)
                     return;
 
@@ -100,7 +100,7 @@ namespace Monq.Core.ClickHouseBuffer.Impl
 
             foreach (var tableGroup in tableGroups)
             {
-                var dbValues = tableGroup.Select(val => val.Event.CreateDbValues(true)).ToArray();
+                var dbValues = tableGroup.Select(val => val.Event.CreateDbValues(val.UseCamelCase)).ToArray();
                 tasks.Add(_eventsWriter.Write(dbValues, tableGroup.Key));
             }
             try
