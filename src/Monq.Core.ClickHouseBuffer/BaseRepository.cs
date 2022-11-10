@@ -6,7 +6,7 @@ using System;
 namespace Monq.Core.ClickHouseBuffer
 {
     /// <summary>
-    /// Базовый репозиторий для взаимодействия с ClickHouse.
+    /// Basic repository for interacting with ClickHouse.
     /// </summary>
     public abstract class BaseRepository
     {
@@ -15,9 +15,9 @@ namespace Monq.Core.ClickHouseBuffer
         protected readonly EngineOptions Options;
 
         /// <summary>
-        /// Инициализирует новый экземпляр класса <see cref="BaseRepository"/>.
+        /// Initializes a new instance of the class <see cref="BaseRepository"/>.
         /// </summary>
-        /// <param name="engineOptions">Конфигурация ClickHouse.</param>
+        /// <param name="engineOptions">ClickHouse configuration.</param>
         protected BaseRepository(IOptions<EngineOptions> engineOptions)
         {
             if (engineOptions == null)
@@ -33,7 +33,7 @@ namespace Monq.Core.ClickHouseBuffer
         }
 
         /// <summary>
-        /// Получить объект соединения с ClickHouse.
+        /// Get the ClickHouse connection object.
         /// </summary>
         /// <returns></returns>
         protected ClickHouseConnection GetConnection()

@@ -3,17 +3,17 @@
 namespace Monq.Core.ClickHouseBuffer
 {
     /// <summary>
-    /// Интерфейс буфера хранилища событий.
+    /// Event storage buffer interface.
     /// </summary>
     public interface IEventsBufferEngine
     {
         /// <summary>
-        /// Добавить событие для записи в ClickHouse.
+        /// Add an event to record in ClickHouse.
         /// </summary>
-        /// <param name="message">Объект, который требуется записать в ClickHouse.</param>
-        /// <param name="tableName">Название таблицы, в которую требуется записать событие.</param>
-        /// <param name="useCamelCase">Флаг, говорящий о том, необходимо ли записывать событие в camelCase.</param>
-        /// <returns><see cref="Task"/>, показывающий завершение операции.</returns>
-        Task AddEvent(object message, string tableName, bool useCamelCase = true);
+        /// <param name="event">The object to be written to ClickHouse.</param>
+        /// <param name="tableName">Name of the table to write the event.</param>
+        /// <param name="useCamelCase">Flag indicating whether the event should be written to camelCase.</param>
+        /// <returns><see cref="Task"/>, showing completion of the operation.</returns>
+        Task AddEvent(object @event, string tableName, bool useCamelCase = true);
     }
 }

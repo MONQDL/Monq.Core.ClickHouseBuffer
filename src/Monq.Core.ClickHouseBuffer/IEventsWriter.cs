@@ -11,9 +11,9 @@ namespace Monq.Core.ClickHouseBuffer
         /// <summary>
         /// Write events to database.
         /// </summary>
-        /// <param name="dbValues">The array of key-value pairs of the "colunm name" -> "value".</param>
-        /// <param name="tableName">The table</param>
+        /// <param name="events">List of events to record in ClickHouse.</param>
+        /// <param name="tableName">The table.</param>
         /// <returns><see cref="Task"/> when the operation completes.</returns>
-        Task Write(IDictionary<string, object>[] dbValues, string tableName);
+        Task Write(IEnumerable<EventItem> events, string tableName);
     }
 }

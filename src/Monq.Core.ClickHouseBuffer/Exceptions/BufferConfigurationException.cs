@@ -3,7 +3,10 @@ using System.Runtime.Serialization;
 
 namespace Monq.Core.ClickHouseBuffer.Exceptions
 {
-    public class BufferConfigurationException: Exception
+    /// <summary>
+    /// Represents errors that occur when the buffer is incorrectly configured.
+    /// </summary>
+    public class BufferConfigurationException : Exception
     {
         /// <summary>Initializes a new instance of the <see cref="BufferConfigurationException" /> class.</summary>
         public BufferConfigurationException()

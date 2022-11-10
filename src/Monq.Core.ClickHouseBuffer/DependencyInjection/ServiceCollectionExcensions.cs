@@ -9,7 +9,7 @@ namespace Monq.Core.ClickHouseBuffer.DependencyInjection
         /// <summary>
         /// Configuring the ClickHouse buffer engine.
         /// </summary>
-        /// <param name="services"></param>
+        /// <param name="services">Service collection.</param>
         /// <param name="configuration">IConfiguration section with engine options, configured.</param>
         /// <param name="clickHouseConnectionString">ClickHouse connection string.</param>
         /// <returns></returns>

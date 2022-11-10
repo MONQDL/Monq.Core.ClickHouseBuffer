@@ -3,12 +3,15 @@ using System.Collections.Generic;
 
 namespace Monq.Core.ClickHouseBuffer.Exceptions
 {
+    /// <summary>
+    /// Represents errors that occur during writing events in ClickHouse.
+    /// </summary>
     public class PersistingException : Exception
     {
         /// <summary>
-        /// The data values.
+        /// The buffer events.
         /// </summary>
-        public IDictionary<string, object>[] DbValues { get; }
+        public IEnumerable<EventItem> Events { get; }
 
         /// <summary>
         /// The table name in whitch the data must be inserted.
@@ -22,15 +25,15 @@ namespace Monq.Core.ClickHouseBuffer.Exceptions
         /// <param name="message">The error message that explains the reason for the exception.</param>
         /// <param name="innerException">The exception that is the cause of the current exception, 
         /// or a null reference (<see langword="Nothing" /> in Visual Basic) if no inner exception is specified.
-        /// <param name="dbValues">The data values.</param>
+        /// <param name="events">The buffer events.</param>
         /// <param name="tableName">The table name in whitch the data must be inserted.</param>
         /// </param>
         public PersistingException(string message,
-            IDictionary<string, object>[] dbValues,
+            IEnumerable<EventItem> events,
             string tableName,
             Exception innerException) : base(message, innerException)
         {
-            DbValues = dbValues;
+            Events = events;
             TableName = tableName;
         }
     }
