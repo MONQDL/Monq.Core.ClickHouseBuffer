@@ -46,7 +46,7 @@ namespace Monq.Core.ClickHouseBuffer
             TableName = tableName;
             UseCamelCase = useCamelCase;
 
-            var dbValues = @event.CreateDbValues();
+            var dbValues = @event.CreateDbValues(UseCamelCase);
             Columns = dbValues.Keys.Select(val => $"`{val}`").ToList().AsReadOnly();
             Values = dbValues.Values.ToList().AsReadOnly();
         }
