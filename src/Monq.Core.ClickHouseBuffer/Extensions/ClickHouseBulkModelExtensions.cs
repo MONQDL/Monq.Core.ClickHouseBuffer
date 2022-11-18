@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Monq.Core.ClickHouseBuffer.Attributes;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Reflection;
@@ -25,7 +26,12 @@ namespace Monq.Core.ClickHouseBuffer.Extensions
             var objType = obj.GetType();
             foreach (var prop in objType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
             {
-                var colName = useCamelCase ? prop.Name.ToCamelCase() : prop.Name;
+                string colName;
+                if (Attribute.GetCustomAttribute(prop, typeof(ClickHouseColumnAttribute), true) is ClickHouseColumnAttribute clickHouseColumn)
+                    colName = clickHouseColumn.Name;
+                else
+                    colName = useCamelCase ? prop.Name.ToCamelCase() : prop.Name;
+
                 var value = prop.GetValue(obj);
                 if (prop.PropertyType.IsEnum)
                 {
