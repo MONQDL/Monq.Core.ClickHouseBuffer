@@ -63,7 +63,8 @@ namespace Monq.Core.ClickHouseBuffer.Impl
             else
                 _avgWriteTimeMs = (sw.ElapsedMilliseconds + _avgWriteTimeMs) / 2;
 
-            _logger.LogInformation("{eventsCount} events has been written to the database. The average writing time per event is {avgWriteTime} ms.",
+            _logger.LogInformation("{eventsCount} events has been written to the database. " +
+                "The average writing time per event is {avgWriteTime} ms.",
                 _writtenCount, _avgWriteTimeMs);
         }
     }

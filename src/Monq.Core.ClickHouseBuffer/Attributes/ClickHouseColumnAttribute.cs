@@ -11,7 +11,7 @@ namespace Monq.Core.ClickHouseBuffer.Attributes
         /// <summary>
         /// Initializes a new instance of <see cref="ClickHouseColumnAttribute"/>.
         /// </summary>
-        /// <param name="name">Наименование поля в БД.</param>
+        /// <param name="name">The name of the field in the database.</param>
         public ClickHouseColumnAttribute(string name)
         {
             if (string.IsNullOrEmpty(name))

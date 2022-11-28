@@ -36,10 +36,7 @@ namespace Monq.Core.ClickHouseBuffer
         /// Get the ClickHouse connection object.
         /// </summary>
         /// <returns></returns>
-        protected ClickHouseConnection GetConnection()
-        {
-            var con = new ClickHouseConnection(_connectionString);
-            return con;
-        }
+        protected ClickHouseConnection GetConnection() =>
+            new ClickHouseConnection(_connectionString);
     }
 }
