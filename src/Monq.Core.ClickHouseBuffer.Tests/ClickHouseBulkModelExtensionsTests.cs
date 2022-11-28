@@ -6,7 +6,7 @@ namespace Monq.Core.ClickHouseBuffer.Tests
 {
     public class ClickHouseBulkModelExtensionsTests
     {
-        [Fact(DisplayName = "Проверить правильность извлечения словаря поле-знаение из объекта")]
+        [Fact(DisplayName = "Check the correctness of field-value dictionary extraction from the object.")]
         public void ShouldProperlyCreateDbValuesDictionary()
         {
             var obj = new TestObject
@@ -25,7 +25,7 @@ namespace Monq.Core.ClickHouseBuffer.Tests
             );
         }
 
-        [Fact(DisplayName = "Проверить правильность извлечения словаря поле-знаение из объекта. Имена в camelCase")]
+        [Fact(DisplayName = "Check if the field-value dictionary is correctly extracted from the object. Names in camelCase")]
         public void ShouldProperlyCreateDbValuesDictionary_NamesInCamelCase()
         {
             var obj = new TestObject

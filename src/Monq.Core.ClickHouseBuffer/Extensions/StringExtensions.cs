@@ -1,5 +1,8 @@
 ﻿namespace Monq.Core.ClickHouseBuffer.Extensions
 {
+    /// <summary>
+    /// A class extension for working with strings.
+    /// </summary>
     public static class StringExtensions
     {
         /// <summary>

@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 namespace Monq.Core.ClickHouseBuffer.Impl
 {
     /// <summary>
-    /// Реализация службы для записи событий в БД.
+    /// Implementation of the service for recording events in the database.
     /// </summary>
     public class EventsWriter : IEventsWriter
     {
@@ -20,8 +20,8 @@ namespace Monq.Core.ClickHouseBuffer.Impl
         long _avgWriteTimeMs;
 
         /// <summary>
-        /// Конструктор реализации службы для записи событий в БД.
-        /// Создаёт новый экземпляр класса <see cref="EventsWriter"/>.
+        /// Service implementation designer for recording events in the database.
+        /// Creates a new instance of the class <see cref="EventsWriter"/>.
         /// </summary>
         public EventsWriter(
             IPersistRepository persistRepository,
@@ -32,41 +32,39 @@ namespace Monq.Core.ClickHouseBuffer.Impl
         }
 
         /// <inheritdoc />
-        public async Task Write(IDictionary<string, object>[] dbValues, string tableName)
+        public async Task Write(IEnumerable<EventItem> events, string tableName)
         {
-            if (dbValues.Length == 0)
+            if (!events.Any())
                 return;
 
-            _logger.LogInformation("Start writing {rowsCount} data rows from the buffer." , dbValues.Length);
+            _logger.LogInformation("Start writing {eventCount} events from the buffer.", events.Count());
 
             var sw = new Stopwatch();
             sw.Start();
 
-            var columns = dbValues[0].Keys.Select(val => $"`{val}`").ToList() as IReadOnlyCollection<string>;
-            var values = dbValues.Select(val => val.Values.ToArray()).ToList();
-
             try
             {
-                await _persistRepository.WriteBatch(columns, values, tableName);
+                await _persistRepository.WriteBatch(events, tableName);
             }
-            catch(Exception e)
+            catch (Exception e)
             {
-                throw new PersistingException("Error while persisting data", dbValues, tableName, e);
+                throw new PersistingException("Error while persisting data", events, tableName, e);
             }
 
             sw.Stop();
 
-            _logger.LogInformation("Buffer has written {rowsCount} rows to the database at {elapsedMilliseconds} ms.", 
-                dbValues.Length, sw.ElapsedMilliseconds);
+            _logger.LogInformation("Buffer has written {eventsCount} events to the database at {elapsedMilliseconds} ms.",
+                events.Count(), sw.ElapsedMilliseconds);
 
-            _writtenCount += dbValues.Length;
+            _writtenCount += events.Count();
 
             if (_avgWriteTimeMs == 0)
                 _avgWriteTimeMs = sw.ElapsedMilliseconds;
             else
                 _avgWriteTimeMs = (sw.ElapsedMilliseconds + _avgWriteTimeMs) / 2;
 
-            _logger.LogInformation("{rowsCount} rows has been written to the database. The average writing time per row is {avgWriteTime} ms.",
+            _logger.LogInformation("{eventsCount} events has been written to the database. " +
+                "The average writing time per event is {avgWriteTime} ms.",
                 _writtenCount, _avgWriteTimeMs);
         }
     }

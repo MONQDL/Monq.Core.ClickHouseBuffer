@@ -1,17 +1,21 @@
-﻿using System;
+﻿using Monq.Core.ClickHouseBuffer.Attributes;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Reflection;
 
 namespace Monq.Core.ClickHouseBuffer.Extensions
 {
+    /// <summary>
+    /// A class extension to work with ClickHouse.
+    /// </summary>
     public static class ClickHouseBulkModelExtensions
     {
         /// <summary>
-        /// Сформировать массив колонок и их значений для записи в БД.
+        /// Generate an array of columns and their values to be written to the database.
         /// </summary>
-        /// <param name="obj">Результат выполенния проверки.</param>
-        /// <param name="useCamelCase"></param>
+        /// <param name="obj">Check result.</param>
+        /// <param name="useCamelCase">Flag indicating whether the event should be written to camelCase.</param>
         /// <returns></returns>
         public static IDictionary<string, object> CreateDbValues(this object? obj, bool useCamelCase = true)
         {
@@ -22,7 +26,16 @@ namespace Monq.Core.ClickHouseBuffer.Extensions
             var objType = obj.GetType();
             foreach (var prop in objType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
             {
-                var colName = useCamelCase ? prop.Name.ToCamelCase() : prop.Name;
+                // Ignore column if IgnoreAttrinute is present.
+                if (Attribute.GetCustomAttribute(prop, typeof(ClickHouseIgnoreAttribute), true) is ClickHouseIgnoreAttribute)
+                    continue;
+
+                string colName;
+                if (Attribute.GetCustomAttribute(prop, typeof(ClickHouseColumnAttribute), true) is ClickHouseColumnAttribute clickHouseColumn)
+                    colName = clickHouseColumn.Name;
+                else
+                    colName = useCamelCase ? prop.Name.ToCamelCase() : prop.Name;
+
                 var value = prop.GetValue(obj);
                 if (prop.PropertyType.IsEnum)
                 {

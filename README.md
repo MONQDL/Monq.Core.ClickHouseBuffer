@@ -73,7 +73,7 @@ The library cat use configuration with schema
 
 `PersistFooHandler.cs`
 
-```
+```csharp
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using RabbitMQCoreClient;
@@ -116,156 +116,129 @@ namespace FooProcessor.Buffer.QueueHandlers
 
 ### Extended configuration
 
-You can define your own repository implementation for recording events in ClickHouse.
-This requires the implementation of the `IPersistRepository` interface. For convenience, you can use the abstract class `BaseRepository`,
-which contains a method for getting a new ClickHouse context and a set of options read from the configuration.
+You can define your own repository implementation for processing events to ClickHouse storage.
 
-`Program.cs`
+#### Interfaces
 
-```csharp
-.ConfigureServices((hostContext, services) =>
-{
-    ...
-    services.ConfigureCHBuffer(
-        hostContext.Configuration.GetSection("BufferEngineOptions"), clickHouseConnectionString);
+`IPostHandler` - implement this interface and add it to DI if you want to postprocess messages saved to ClickHouse storage.
+Has no default implementation.
 
-    services.AddTransient<IPersistRepository, MyPersistRepositoryImpl>();
-    ...
-})
-```
-
----
-
-*Russian*
-
-Библиотека дает возможность записывать данные в ClickHouse с использование механизма буферизации.
-
-Как известно, ClickHouse выполняет вставку записываемых данных пакетным образом и если выполнять вставки по одной записи,
-то ClickHouse начнет поедать процессорное время и потреблять IO дисковой подсистеме с очень высоким темпом. 
-Для того, чтобы ClickHouse работал корректно и быстро, требуется выполнять вставку данных пачками, или сбрасывать накопившиеся данные
-раз в определенное время. Библиотека реализовывает такой механизм.
-
-В предварительной версии пока что нету:
-
-1. Выполнения асинхронной постобработки событий после их сохранения в БД или при ошибке сохранения.
-2. Нет красивой обработки ошибок записи.
-
-## Установка
-
-```powershell
-Install-Package Monq.Core.ClickHouseBuffer
-```
-
-## Подключение
-
-В Program.cs для консольных приложений или в Startup.cs для asp.net требуется добавить метод конфигурации буфера.
+Example:
 
 ```csharp
-services.ConfigureCHBuffer(Configuration.GetSection(BufferEngineOptions), clickHouseConnectionString);
-```
-
-`clickHouseConnectionString` - строка вида
-
-```
-Host=clickhouse<-http-host>;Port=80;Username=<user>;Password=<password>;Database=<database>;
-```
-
-### Конфигурация в appsettings.json
-
-Буфер принимает конфигурацию по такой схеме
-
-```json
+public class PostEventHandler : IPostHandler
 {
-	"EventsFlushPeriodSec": 2,
-	"EventsFlushCount": 500,
-	"MaxDegreeOfParallelism": 1
-}
-```
+    readonly IQueueService _queueService;
 
-### Пример реализации библиотеки Monq.Core.ClickHouseBuffer с RabbitMQCoreClient и Monq.Core.BasicDotNetMicroservice.
-
-`Program.cs`
-
-```csharp
-.ConfigureServices((hostContext, services) =>
-{
-    var configuration = hostContext.Configuration;
-
-    var clickHouseConnectionString = hostContext.Configuration["ClickHouseConnectionString"];
-
-    services.ConfigureCHBuffer(
-        hostContext.Configuration.GetSection("BufferEngineOptions"), clickHouseConnectionString);
-
-    services
-        .AddRabbitMQCoreClientConsumer(configuration.GetSection("RabbitMq"))
-        .AddHandler<PersistFooHandler>(
-            new[] { "fooEntity.persist" },
-            new ConsumerHandlerOptions
-            {
-                RetryKey = "fooEntity.persist.buffer-retry"
-            });
-})
-```
-
-`PersistFooHandler.cs`
-
-```
-using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
-using RabbitMQCoreClient;
-using RabbitMQCoreClient.Models;
-using System.Threading.Tasks;
-
-namespace FooProcessor.Buffer.QueueHandlers
-{
-    public class PersistFooHandler : MessageHandlerJson<FooEntity>
+    public PostEventHandler(IQueueService queueService)
     {
-        readonly IEventsBufferEngine<FooEntity> _eventsBufferEngine;
-        readonly ILogger<PersistFooHandler> _logger;
+        _queueService = queueService;
+    }
 
-        public PersistFooHandler(
-            IEventsBufferEngine<FooEntity> eventsBufferEngine,
-            ILogger<PersistFooHandler> logger)
-        {
-            _eventsBufferEngine = eventsBufferEngine;
-            _logger = logger;
-        }
-
-        protected override ValueTask OnParseError(string json, JsonException e, RabbitMessageEventArgs args)
-        {
-            var message = $"Error while deserializing json to type {nameof(FooEntity)}.";
-            _logger.LogCritical(message);
-            ErrorMessageRouter.MoveToDeadLetter();
-            return base.OnParseError(json, e, args);
-        }
-
-        protected override Task HandleMessage(FooEntity message, RabbitMessageEventArgs args)
-        {
-            if (message is null)
-                return Task.CompletedTask;
-
-            return _eventsBufferEngine.AddEvent(message, "clickHouseTable");
-        }
+    public async Task Handle(IEnumerable<EventItem> events)
+    {
+        // implementation
     }
 }
 ```
 
-### Расширенная настройка
-
-Можно определить собственную реализацию репозитория для записи событий в ClickHouse. 
-Для этого требуется реализовать интерфейс `IPersistRepository`. Для удобства, можно использовать абстрактный класс `BaseRepository`,
-который содержит метод получения нового контекста ClickHouse и набор опций, прочитанных из конфигурации.
-
-`Program.cs`
+Dependency injection:
 
 ```csharp
-.ConfigureServices((hostContext, services) =>
-{
-    ...
-    services.ConfigureCHBuffer(
-        hostContext.Configuration.GetSection("BufferEngineOptions"), clickHouseConnectionString);
-
-    services.AddTransient<IPersistRepository, MyPersistRepositoryImpl>();
-    ...
-})
+services.AddTransient<IPostHandler, PostEventHandler>();
 ```
+
+`IErrorEventsHandler` - implement this interface and add it to DI if you want to process messages 
+that had errors while saving to ClickHouse storage. Has no default implementation.
+
+Example:
+
+```csharp
+public class ErrorEventsHandler : IErrorEventsHandler
+{
+    readonly IQueueService _queueService;
+    readonly IOptions<AppOptions> _appOptions;
+
+    public ErrorEventsHandler(IQueueService queueService, IOptions<AppOptions> appOptions)
+    {
+        _queueService = queueService;
+        _appOptions = appOptions;
+    }
+
+    public async Task Handle(IEnumerable<EventItem> events)
+    {
+        // implementation
+    }
+}
+```
+
+Dependency injection:
+
+```csharp
+services.AddTransient<IErrorEventsHandler, ErrorEventsHandler>();
+```
+
+`IPersistRepository` - implement this interface and add it to DI if you want to use custom save to storage logics while saving to ClickHouse storage. 
+There is default implementation of the repository. If you add to DI your own implementation you will override the default one.
+For convenience, you can use the abstract class `BaseRepository`,
+which contains a method for getting a new ClickHouse context and a set of options read from the configuration.
+
+Example:
+
+```csharp
+public class ClickHousePersistRepository : BaseRepository, IPersistRepository
+{
+    /// <inheritdoc />
+    public ClickHousePersistRepository(IOptions<EngineOptions> engineOptions) : base(engineOptions)
+    {
+    }
+
+    /// <inheritdoc />
+    public async Task WriteBatch(IEnumerable<EventItem> events, string tableName)
+    {
+        await using var connection = GetConnection();
+
+        var eventItems = GetDenormalizeEvents(events, tableName);
+
+        var columns = eventItems.Select(x => x.Columns).FirstOrDefault();
+        var values = eventItems.Select(x => x.Values.ToArray());
+
+        using var command = new ClickHouseBulkCopy(connection)
+        {
+            MaxDegreeOfParallelism = Options.MaxDegreeOfParallelism,
+            BatchSize = Options.EventsFlushCount,
+            DestinationTableName = connection.Database + "." + tableName
+        };
+        await command.WriteToServerAsync(values, columns);
+    }
+
+    IEnumerable<EventItem> GetDenormalizeEvents(IEnumerable<EventItem> events, string tableName)
+    {
+        var result = new List<EventItem>();
+
+        foreach (var @event in events)
+        {
+            var items = ((EtlBuildCreateModel)@event.Event).GetBuilds()
+                .Select(x => new EventItem(x, tableName, @event.UseCamelCase))
+                .ToList();
+
+            result.AddRange(items);
+        }
+        return result;
+    }
+}
+```
+
+Dependency injection:
+
+```csharp
+services.AddTransient<IPersistRepository, ClickHousePersistRepository>();
+```
+
+#### Attributes
+
+The library support property attributes:
+
+`[ClickHouseColumn("ColumnName")]` - use this attribute if the ClickHouse column name is different that class property name.
+
+`[ClickHouseIgnore]` - use this attribute if serializer must ignore property while saving the value to database.
