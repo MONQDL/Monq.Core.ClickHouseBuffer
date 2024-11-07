@@ -1,27 +1,28 @@
 ﻿using System;
 
-namespace Monq.Core.ClickHouseBuffer.Attributes;
-
-/// <summary>
-/// Use this attribute if the ClickHouse column name is different that class property name.
-/// </summary>
-[AttributeUsage(AttributeTargets.Property)]
-public class ClickHouseColumnAttribute : Attribute
+namespace Monq.Core.ClickHouseBuffer.Attributes
 {
     /// <summary>
-    /// Initializes a new instance of <see cref="ClickHouseColumnAttribute"/>.
+    /// Use this attribute if the ClickHouse column name is different that class property name.
     /// </summary>
-    /// <param name="name">The name of the field in the database.</param>
-    public ClickHouseColumnAttribute(string name)
+    [AttributeUsage(AttributeTargets.Property)]
+    public class ClickHouseColumnAttribute : Attribute
     {
-        if (string.IsNullOrEmpty(name))
-            throw new ArgumentException($"{nameof(name)} is null or empty.", nameof(name));
+        /// <summary>
+        /// Initializes a new instance of <see cref="ClickHouseColumnAttribute"/>.
+        /// </summary>
+        /// <param name="name">The name of the field in the database.</param>
+        public ClickHouseColumnAttribute(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                throw new ArgumentException($"{nameof(name)} is null or empty.", nameof(name));
 
-        Name = name;
+            Name = name;
+        }
+
+        /// <summary>
+        /// The name of the field in the database.
+        /// </summary>
+        public string Name { get; }
     }
-
-    /// <summary>
-    /// The name of the field in the database.
-    /// </summary>
-    public string Name { get; }
 }
