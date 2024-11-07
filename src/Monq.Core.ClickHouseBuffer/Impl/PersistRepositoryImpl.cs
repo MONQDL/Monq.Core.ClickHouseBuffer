@@ -4,37 +4,36 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Monq.Core.ClickHouseBuffer.Impl
+namespace Monq.Core.ClickHouseBuffer.Impl;
+
+/// <summary>
+/// Repository for writing data in ClickHouse.
+/// </summary>
+public class DefaultRepository
+    : BaseRepository, IPersistRepository
 {
     /// <summary>
-    /// Repository for writing data in ClickHouse.
+    /// Initializes a new instance of the class <see cref="DefaultRepository" />.
     /// </summary>
-    public class DefaultRepository
-        : BaseRepository, IPersistRepository
+    /// <param name="engineOptions">ClickHouse configuration.</param>
+    public DefaultRepository(
+        IOptions<EngineOptions> engineOptions) : base(engineOptions)
+    { }
+
+    /// <inheritdoc />
+    public async Task WriteBatch(IEnumerable<EventItem> events, string tableName)
     {
-        /// <summary>
-        /// Initializes a new instance of the class <see cref="DefaultRepository" />.
-        /// </summary>
-        /// <param name="engineOptions">ClickHouse configuration.</param>
-        public DefaultRepository(
-            IOptions<EngineOptions> engineOptions) : base(engineOptions)
-        { }
+        await using var connection = GetConnection();
 
-        /// <inheritdoc />
-        public async Task WriteBatch(IEnumerable<EventItem> events, string tableName)
+        var columns = events.Select(x => x.Columns).FirstOrDefault();
+        var values = events.Select(x => x.Values.ToArray());
+
+        using var command = new ClickHouseBulkCopy(connection)
         {
-            await using var connection = GetConnection();
-
-            var columns = events.Select(x => x.Columns).FirstOrDefault();
-            var values = events.Select(x => x.Values.ToArray());
-
-            using var command = new ClickHouseBulkCopy(connection)
-            {
-                MaxDegreeOfParallelism = Options.MaxDegreeOfParallelism,
-                BatchSize = Options.EventsFlushCount,
-                DestinationTableName = connection.Database + "." + tableName
-            };
-            await command.WriteToServerAsync(values, columns);
-        }
+            MaxDegreeOfParallelism = Options.MaxDegreeOfParallelism,
+            BatchSize = Options.EventsFlushCount,
+            DestinationTableName = connection.Database + "." + tableName
+        };
+        await command.WriteToServerAsync(values, columns);
     }
 }
