@@ -1,10 +1,11 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Monq.Core.ClickHouseBuffer.Exceptions;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -43,8 +44,8 @@ namespace Monq.Core.ClickHouseBuffer.Impl
             if (engineOptions.Value == null)
                 throw new ArgumentNullException(nameof(engineOptions.Value), $"{nameof(engineOptions.Value)} is null.");
 
-            _postHandler = (IPostHandler)serviceProvider.GetService(typeof(IPostHandler));
-            _errorEventsHandler = (IErrorEventsHandler)serviceProvider.GetService(typeof(IErrorEventsHandler));
+            _postHandler = (IPostHandler)serviceProvider.GetRequiredService(typeof(IPostHandler));
+            _errorEventsHandler = (IErrorEventsHandler)serviceProvider.GetRequiredService(typeof(IErrorEventsHandler));
             _engineOptions = engineOptions.Value;
             _eventsWriter = eventsWriter;
             _logger = logger;
@@ -127,7 +128,7 @@ namespace Monq.Core.ClickHouseBuffer.Impl
                     var persistException = aggregateException?.InnerExceptions?.First() as PersistingException;
                     if (persistException != null)
                     {
-                        var json = JsonConvert.SerializeObject(persistException.Events, Formatting.Indented);
+                        var json = JsonSerializer.Serialize(persistException.Events);
                         var extendedError = string.Join(Environment.NewLine, new[]
                         {
                             $"Table: {persistException.TableName}. Source: ", json

@@ -12,7 +12,9 @@ namespace Monq.Core.ClickHouseBuffer
     {
         readonly string _connectionString;
 
-        protected readonly EngineOptions Options;
+        readonly EngineOptions _options;
+
+        protected EngineOptions Options => _options;
 
         /// <summary>
         /// Initializes a new instance of the class <see cref="BaseRepository"/>.
@@ -28,7 +30,7 @@ namespace Monq.Core.ClickHouseBuffer
             if (string.IsNullOrEmpty(engineOptions.Value.ConnectionString))
                 throw new BufferConfigurationException($"{nameof(engineOptions.Value.ConnectionString)} is null or empty.");
 
-            Options = engineOptions.Value;
+            _options = engineOptions.Value;
             _connectionString = engineOptions.Value.ConnectionString;
         }
 

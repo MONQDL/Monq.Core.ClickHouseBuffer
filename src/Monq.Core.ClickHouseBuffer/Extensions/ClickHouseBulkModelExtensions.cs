@@ -26,7 +26,7 @@ namespace Monq.Core.ClickHouseBuffer.Extensions
             var objType = obj.GetType();
             foreach (var prop in objType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
             {
-                // Ignore column if IgnoreAttrinute is present.
+                // Ignore column if IgnoreAttribute is present.
                 if (Attribute.GetCustomAttribute(prop, typeof(ClickHouseIgnoreAttribute), true) is ClickHouseIgnoreAttribute)
                     continue;
 

@@ -6,7 +6,7 @@
     public static class StringExtensions
     {
         /// <summary>
-        /// Converts the string <paramref name="value"/> to camelcase.
+        /// Converts the string <paramref name="value"/> to camelCase.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns></returns>

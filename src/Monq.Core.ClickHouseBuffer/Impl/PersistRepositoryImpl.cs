@@ -28,13 +28,16 @@ namespace Monq.Core.ClickHouseBuffer.Impl
             var columns = events.Select(x => x.Columns).FirstOrDefault();
             var values = events.Select(x => x.Values.ToArray());
 
-            using var command = new ClickHouseBulkCopy(connection)
+            using var bulkCopy = new ClickHouseBulkCopy(connection)
             {
                 MaxDegreeOfParallelism = Options.MaxDegreeOfParallelism,
                 BatchSize = Options.EventsFlushCount,
-                DestinationTableName = connection.Database + "." + tableName
+                DestinationTableName = connection.Database + "." + tableName,
+                ColumnNames = columns
             };
-            await command.WriteToServerAsync(values, columns);
+            await bulkCopy.InitAsync(); // Prepares ClickHouseBulkCopy instance by loading target column types
+
+            await bulkCopy.WriteToServerAsync(values);
         }
     }
 }
