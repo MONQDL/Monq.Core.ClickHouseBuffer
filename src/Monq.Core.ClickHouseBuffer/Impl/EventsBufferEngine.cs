@@ -21,8 +21,8 @@ namespace Monq.Core.ClickHouseBuffer.Impl
 #pragma warning restore IDE0052 // Delete unread closed members
         readonly List<EventItem> _events = new List<EventItem>();
         readonly IEventsWriter _eventsWriter;
-        readonly IPostHandler _postHandler;
-        readonly IErrorEventsHandler _errorEventsHandler;
+        readonly IPostHandler? _postHandler;
+        readonly IErrorEventsHandler? _errorEventsHandler;
         readonly EngineOptions _engineOptions;
         readonly ILogger<EventsBufferEngine> _logger;
 
@@ -44,8 +44,8 @@ namespace Monq.Core.ClickHouseBuffer.Impl
             if (engineOptions.Value == null)
                 throw new ArgumentNullException(nameof(engineOptions.Value), $"{nameof(engineOptions.Value)} is null.");
 
-            _postHandler = (IPostHandler)serviceProvider.GetRequiredService(typeof(IPostHandler));
-            _errorEventsHandler = (IErrorEventsHandler)serviceProvider.GetRequiredService(typeof(IErrorEventsHandler));
+            _postHandler = (IPostHandler?)serviceProvider.GetService(typeof(IPostHandler));
+            _errorEventsHandler = (IErrorEventsHandler?)serviceProvider.GetService(typeof(IErrorEventsHandler));
             _engineOptions = engineOptions.Value;
             _eventsWriter = eventsWriter;
             _logger = logger;
