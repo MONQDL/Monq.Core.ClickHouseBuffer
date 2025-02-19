@@ -23,12 +23,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="ClickHouse.Client" Version="7.10.0" />
+    <PackageReference Include="ClickHouse.Client" Version="7.11.0" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
   </ItemGroup>
 
-	<ItemGroup>
-		<FrameworkReference Include="Microsoft.AspNetCore.App" />
-	</ItemGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
 
 </Project>

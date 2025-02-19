@@ -50,16 +50,8 @@ namespace Monq.Core.ClickHouseBuffer.Extensions
                     else
                         value = Enum.ToObject(prop.PropertyType, value).ToString();
                 }
-                else if (prop.PropertyType == typeof(DateTimeOffset))
-                {
-                    if (value is null)
-                        value = default(DateTimeOffset).UtcDateTime;
-                    else
-                        value = ((DateTimeOffset)value).UtcDateTime;
-                }
 
-                if (value is null)
-                    value = GetDefaultValue(prop);
+                value ??= GetDefaultValue(prop);
 
                 if (value != null)
                     result.Add(colName, value);
