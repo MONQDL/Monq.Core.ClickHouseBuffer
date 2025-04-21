@@ -1,4 +1,3 @@
-﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Monq.Core.ClickHouseBuffer.Exceptions;
@@ -9,147 +8,146 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Monq.Core.ClickHouseBuffer.Impl
+namespace Monq.Core.ClickHouseBuffer.Impl;
+
+/// <summary>
+/// Implementation of the event storage buffer.
+/// </summary>
+public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
 {
-    /// <summary>
-    /// Implementation of the event storage buffer.
-    /// </summary>
-    public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
-    {
 #pragma warning disable IDE0052 // Delete unread closed members
-        readonly Timer _flushTimer;
+    readonly Timer _flushTimer;
 #pragma warning restore IDE0052 // Delete unread closed members
-        readonly List<EventItem> _events = new List<EventItem>();
-        readonly IEventsWriter _eventsWriter;
-        readonly IPostHandler? _postHandler;
-        readonly IErrorEventsHandler? _errorEventsHandler;
-        readonly EngineOptions _engineOptions;
-        readonly ILogger<EventsBufferEngine> _logger;
+    readonly List<EventItem> _events = new List<EventItem>();
+    readonly IEventsWriter _eventsWriter;
+    readonly IPostHandler? _postHandler;
+    readonly IErrorEventsHandler? _errorEventsHandler;
+    readonly EngineOptions _engineOptions;
+    readonly ILogger<EventsBufferEngine> _logger;
 
-        static readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
+    static readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
 
-        /// <summary>
-        /// The implementation constructor of the event storage buffer.
-        /// Creates a new instance of the class <see cref="EventsBufferEngine"/>.
-        /// </summary>
-        public EventsBufferEngine(
-            IOptions<EngineOptions> engineOptions,
-            IEventsWriter eventsWriter,
-            ILogger<EventsBufferEngine> logger,
-            IServiceProvider serviceProvider
-            )
+    /// <summary>
+    /// The implementation constructor of the event storage buffer.
+    /// Creates a new instance of the class <see cref="EventsBufferEngine"/>.
+    /// </summary>
+    public EventsBufferEngine(
+        IOptions<EngineOptions> engineOptions,
+        IEventsWriter eventsWriter,
+        ILogger<EventsBufferEngine> logger,
+        IServiceProvider serviceProvider
+        )
+    {
+        if (engineOptions == null)
+            throw new ArgumentNullException(nameof(engineOptions), $"{nameof(engineOptions)} is null.");
+        if (engineOptions.Value == null)
+            throw new ArgumentNullException(nameof(engineOptions.Value), $"{nameof(engineOptions.Value)} is null.");
+
+        _postHandler = (IPostHandler?)serviceProvider.GetService(typeof(IPostHandler));
+        _errorEventsHandler = (IErrorEventsHandler?)serviceProvider.GetService(typeof(IErrorEventsHandler));
+        _engineOptions = engineOptions.Value;
+        _eventsWriter = eventsWriter;
+        _logger = logger;
+
+        _flushTimer = new Timer(async obj => await FlushTimerDelegate(obj).ConfigureAwait(false), null,
+            _engineOptions.EventsFlushPeriodSec * 1000,
+            _engineOptions.EventsFlushPeriodSec * 1000);
+    }
+
+    /// <inheritdoc />
+    public async Task AddEvent(object @event, string tableName, bool useCamelCase = true)
+    {
+        await _semaphore.WaitAsync().ConfigureAwait(false);
+
+        try
         {
-            if (engineOptions == null)
-                throw new ArgumentNullException(nameof(engineOptions), $"{nameof(engineOptions)} is null.");
-            if (engineOptions.Value == null)
-                throw new ArgumentNullException(nameof(engineOptions.Value), $"{nameof(engineOptions.Value)} is null.");
+            _events.Add(new EventItem(@event, tableName, useCamelCase));
+            if (_events.Count < _engineOptions.EventsFlushCount)
+                return;
 
-            _postHandler = (IPostHandler?)serviceProvider.GetService(typeof(IPostHandler));
-            _errorEventsHandler = (IErrorEventsHandler?)serviceProvider.GetService(typeof(IErrorEventsHandler));
-            _engineOptions = engineOptions.Value;
-            _eventsWriter = eventsWriter;
-            _logger = logger;
-
-            _flushTimer = new Timer(async obj => await FlushTimerDelegate(obj), null,
-                _engineOptions.EventsFlushPeriodSec * 1000,
-                _engineOptions.EventsFlushPeriodSec * 1000);
+            await Flush().ConfigureAwait(false);
         }
-
-        /// <inheritdoc />
-        public async Task AddEvent(object @event, string tableName, bool useCamelCase = true)
+        finally
         {
-            await _semaphore.WaitAsync();
-
-            try
-            {
-                _events.Add(new EventItem(@event, tableName, useCamelCase));
-                if (_events.Count < _engineOptions.EventsFlushCount)
-                    return;
-
-                await Flush();
-            }
-            finally
-            {
-                _semaphore.Release();
-            }
+            _semaphore.Release();
         }
+    }
 
-        async Task FlushTimerDelegate(object? _)
+    async Task FlushTimerDelegate(object? _)
+    {
+        await _semaphore.WaitAsync().ConfigureAwait(false);
+        try
         {
-            await _semaphore.WaitAsync();
-            try
-            {
-                await Flush();
-            }
-            finally
-            {
-                _semaphore.Release();
-            }
+            await Flush().ConfigureAwait(false);
         }
-
-        Task Flush()
+        finally
         {
-            if (_events.Count == 0)
-                return Task.CompletedTask;
-
-            var eventsCache = _events.ToArray();
-            _events.Clear();
-
-            return HandleEvents(eventsCache);
+            _semaphore.Release();
         }
+    }
 
-        async Task HandleEvents(IEnumerable<EventItem> events)
+    Task Flush()
+    {
+        if (_events.Count == 0)
+            return Task.CompletedTask;
+
+        var eventsCache = _events.ToArray();
+        _events.Clear();
+
+        return HandleEvents(eventsCache);
+    }
+
+    async Task HandleEvents(IEnumerable<EventItem> events)
+    {
+        var tableGroups = events.GroupBy(x => x.TableName);
+        var tasks = new List<Task>();
+
+        foreach (var tableGroup in tableGroups)
+            tasks.Add(_eventsWriter.Write(tableGroup, tableGroup.Key));
+
+        try
         {
-            var tableGroups = events.GroupBy(x => x.TableName);
-            var tasks = new List<Task>();
+            await Task.WhenAll(tasks).ConfigureAwait(false);
 
-            foreach (var tableGroup in tableGroups)
-                tasks.Add(_eventsWriter.Write(tableGroup, tableGroup.Key));
+            if (_postHandler != null)
+                await _postHandler.Handle(events).ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Error while trying to write batch of data to Storage.");
 
-            try
+            var exceptions = tasks
+                .Where(t => t.Exception != null)
+                .Select(t => t.Exception)
+                .ToList();
+
+            var errorEvents = new List<EventItem>();
+            foreach (var aggregateException in exceptions)
             {
-                await Task.WhenAll(tasks);
-
-                if (_postHandler != null)
-                    await _postHandler.Handle(events);
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(e, "Error while trying to write batch of data to Storage.");
-
-                var exceptions = tasks
-                    .Where(t => t.Exception != null)
-                    .Select(t => t.Exception)
-                    .ToList();
-
-                var errorEvents = new List<EventItem>();
-                foreach (var aggregateException in exceptions)
+                var persistException = aggregateException?.InnerExceptions?.First() as PersistingException;
+                if (persistException != null)
                 {
-                    var persistException = aggregateException?.InnerExceptions?.First() as PersistingException;
-                    if (persistException != null)
+                    var json = JsonSerializer.Serialize(persistException.Events);
+                    var extendedError = string.Join(Environment.NewLine, new[]
                     {
-                        var json = JsonSerializer.Serialize(persistException.Events);
-                        var extendedError = string.Join(Environment.NewLine, new[]
-                        {
-                            $"Table: {persistException.TableName}. Source: ", json
-                        });
-                        _logger.LogDebug(extendedError);
+                        $"Table: {persistException.TableName}. Source: ", json
+                    });
+                    _logger.LogDebug(extendedError);
 
-                        errorEvents.AddRange(persistException.Events);
-                    }
+                    errorEvents.AddRange(persistException.Events);
                 }
-
-                if (_errorEventsHandler != null)
-                    await _errorEventsHandler.Handle(errorEvents);
             }
-        }
 
-        /// <summary>
-        /// Free up resources.
-        /// </summary>
-        public void Dispose()
-        {
-            _flushTimer?.Dispose();
+            if (_errorEventsHandler != null)
+                await _errorEventsHandler.Handle(errorEvents).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Free up resources.
+    /// </summary>
+    public void Dispose()
+    {
+        _flushTimer?.Dispose();
     }
 }
