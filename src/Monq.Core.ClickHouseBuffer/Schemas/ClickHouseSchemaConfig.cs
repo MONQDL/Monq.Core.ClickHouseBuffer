@@ -12,6 +12,7 @@ public class ClickHouseSchemaConfig
     public static ClickHouseSchemaConfig GlobalSettings { get; } = new ClickHouseSchemaConfig();
 
     static ConcurrentDictionary<TypeTuple, TypeAdapterSettings> _rulesMap = new ConcurrentDictionary<TypeTuple, TypeAdapterSettings>();
+    public static ConcurrentDictionary<TypeTuple, TypeAdapterSettings> RulesMap { get => _rulesMap; }
 
     public TypeAdapterSetter<TSource> NewConfig<TSource>(string tableName)
     {
