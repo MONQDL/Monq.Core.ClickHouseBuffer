@@ -44,11 +44,11 @@ public class SchemaTests
         var columns = e.ClickHouseColumns("logs");
 
         Assert.Collection(columns,
-            x => Assert.Equal("_rawJson", x),
-            x => Assert.Equal("_userspaceId", x),
-            x => Assert.Equal("_aggregatedAt", x),
-            x => Assert.Equal("_streamName", x),
-            x => Assert.Equal("_streamId", x));
+            x => Assert.Equal("`_rawJson`", x),
+            x => Assert.Equal("`_userspaceId`", x),
+            x => Assert.Equal("`_aggregatedAt`", x),
+            x => Assert.Equal("`_streamName`", x),
+            x => Assert.Equal("`_streamId`", x));
     }
 
     [Fact]
