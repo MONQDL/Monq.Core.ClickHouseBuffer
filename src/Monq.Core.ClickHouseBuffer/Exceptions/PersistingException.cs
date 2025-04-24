@@ -14,7 +14,7 @@ public class PersistingException : Exception
     public IEnumerable<EventItem> Events { get; }
 
     /// <summary>
-    /// The table name in whitch the data must be inserted.
+    /// The table name in which the data must be inserted.
     /// </summary>
     public string TableName { get; }
 
@@ -26,7 +26,7 @@ public class PersistingException : Exception
     /// <param name="innerException">The exception that is the cause of the current exception, 
     /// or a null reference (<see langword="Nothing" /> in Visual Basic) if no inner exception is specified.
     /// <param name="events">The buffer events.</param>
-    /// <param name="tableName">The table name in whitch the data must be inserted.</param>
+    /// <param name="tableName">The table name in which the data must be inserted.</param>
     /// </param>
     public PersistingException(string message,
         IEnumerable<EventItem> events,

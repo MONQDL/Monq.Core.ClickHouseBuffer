@@ -1,5 +1,8 @@
+using ClickHouse.Client;
+using ClickHouse.Client.ADO;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Monq.Core.ClickHouseBuffer.Impl;
 
 namespace Monq.Core.ClickHouseBuffer.DependencyInjection;
@@ -22,9 +25,13 @@ public static class ServiceCollectionExtensions
 
         services.Configure<EngineOptions>(configuration);
         services.Configure<EngineOptions>(c => c.ConnectionString = clickHouseConnectionString);
-
-        services.AddTransient<IEventsWriter, EventsWriter>();
-        services.AddTransient<IPersistRepository, DefaultRepository>();
+#if NET8_0_OR_GREATER
+        services.AddClickHouseDataSource(clickHouseConnectionString);
+#else
+        services.TryAddTransient<IClickHouseConnection>((s) => new ClickHouseConnection(clickHouseConnectionString));
+#endif
+        services.AddTransient<IEventsWriter, DefaultClickHouseEventsWriter>();
+        // Must be singleton.
         services.AddSingleton<IEventsBufferEngine, EventsBufferEngine>();
 
         return services;

@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 
 namespace Monq.Core.ClickHouseBuffer.Schemas;
 

@@ -1,6 +1,6 @@
 using Monq.Core.ClickHouseBuffer.Schemas;
 
-namespace Monq.Core.ClickHouseBuffer.Tests.Models;
+namespace Monq.Core.ClickHouseBuffer.PerformanceTests;
 
 public class MyFullSchemaConfig : ITableSchema
 {
@@ -15,12 +15,3 @@ public class MyFullSchemaConfig : ITableSchema
     }
 }
 
-public class MyShortSchemaConfig : ITableSchema
-{
-    public void Register(ClickHouseSchemaConfig config)
-    {
-        config.NewConfig<MyEvent>("logs_short")
-            .Map("_streamId", x => x.StreamId)
-            .Map("_streamName", x => x.StreamName);
-    }
-}

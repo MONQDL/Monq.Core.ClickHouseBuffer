@@ -11,8 +11,10 @@ public class ClickHouseSchemaConfig
 {
     public static ClickHouseSchemaConfig GlobalSettings { get; } = new ClickHouseSchemaConfig();
 
-    static ConcurrentDictionary<TypeTuple, TypeAdapterSettings> _rulesMap = new ConcurrentDictionary<TypeTuple, TypeAdapterSettings>();
-    public static ConcurrentDictionary<TypeTuple, TypeAdapterSettings> RulesMap { get => _rulesMap; }
+    ConcurrentDictionary<TypeTuple, TypeAdapterSettings> _rulesMap = new ConcurrentDictionary<TypeTuple, TypeAdapterSettings>();
+    public ConcurrentDictionary<TypeTuple, TypeAdapterSettings> RulesMap { get => _rulesMap; }
+
+    ConcurrentDictionary<TypeTuple, string[]> _columnsMap = new ConcurrentDictionary<TypeTuple, string[]>();
 
     public TypeAdapterSetter<TSource> NewConfig<TSource>(string tableName)
     {
@@ -38,13 +40,13 @@ public class ClickHouseSchemaConfig
                 .Resolvers
                 .Select(x =>
                 {
-                    var compile = (Func<TSource, object>)(x.Invoker.Compile());
-                    return compile(source);
+                    var fn = (Func<TSource, object>)x.Invoker!;
+                    return fn(source);
                 })
                 .ToArray();
         }
         else
-            throw new Exception();
+            throw new Exception($"The type map \"{sourceType.Name}\" to \"{tableName}\" was not found");
     }
 
     public string[] GetMappedColumns<TSource>(TSource? source, string tableName)
@@ -52,23 +54,24 @@ public class ClickHouseSchemaConfig
         if (source is null)
             return Array.Empty<string>();
 
-        var sourceType = source.GetType();
+        return GetMappedColumns(new TypeTuple(source.GetType(), tableName));
+    }
 
-        if (_rulesMap.TryGetValue(new TypeTuple(sourceType, tableName), out var settings))
+    public string[] GetMappedColumns(in TypeTuple key)
+    {
+        return _columnsMap.GetOrAdd(key, static (k, rules) =>
         {
-            return settings
-                .Resolvers
-                .Select(x => x.ColumnName)
-                .ToArray();
-        }
-        else
-            throw new Exception();
+            if (!rules.TryGetValue(k, out var settings))
+                throw new Exception($"The type map \"{k.Source.Name}\" to \"{k.TableName}\" was not found");
+
+            return settings.Resolvers.Select(x => x.ColumnName).ToArray();
+        }, _rulesMap);
     }
 
     /// <summary>
     /// Scans and registers mappings from specified assemblies.
     /// </summary>
-    /// <param name="assemblies">assemblies to scan.</param>
+    /// <param name="assemblies">Assemblies to scan.</param>
     /// <returns>A list of registered mappings</returns>
     public IList<ITableSchema> Scan(params Assembly[] assemblies)
     {

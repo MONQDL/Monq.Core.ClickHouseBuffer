@@ -24,9 +24,15 @@ public class TypeAdapterSetter<TSource> : TypeAdapterSetter
         string memberName,
         Expression<Func<TSource, TSourceMember>> source)
     {
-        //this.CheckCompiled();
+        this.CheckCompiled();
 
-        var invoker = Expression.Lambda(source.Body, Expression.Parameter(typeof(object)));
+        // Перестраиваем выражение с конвертацией результата в object
+        var convertedExpr = Expression.Lambda<Func<TSource, object>>(
+            Expression.Convert(source.Body, typeof(object)),
+            source.Parameters
+        );
+
+        var invoker = convertedExpr.Compile();
 
         Settings.Resolvers.Add(new InvokerModel
         {
@@ -34,5 +40,14 @@ public class TypeAdapterSetter<TSource> : TypeAdapterSetter
             Invoker = invoker,
         });
         return this;
+    }
+}
+
+public static class TypeAdapterSetterExtensions
+{
+    internal static void CheckCompiled<TSetter>(this TSetter setter) where TSetter : TypeAdapterSetter
+    {
+        if (setter.Settings.Compiled)
+            throw new InvalidOperationException("TypeAdapter.Adapt was already called, please clone or create new TypeAdapterConfig.");
     }
 }

@@ -13,9 +13,9 @@ public sealed class EngineOptions
 
     /// <summary>
     /// The number of events, when reached, to reset (write) to the database.
-    /// Default: 500.
+    /// Default: 10000.
     /// </summary>
-    public int EventsFlushCount { get; set; } = 500;
+    public int EventsFlushCount { get; set; } = 10000;
 
     /// <summary>
     /// Connection string in ClickHouse.

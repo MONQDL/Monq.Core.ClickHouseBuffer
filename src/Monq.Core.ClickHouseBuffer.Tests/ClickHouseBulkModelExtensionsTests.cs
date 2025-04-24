@@ -16,12 +16,19 @@ public class ClickHouseBulkModelExtensionsTests
             Flag = true,
             PublicField = "Bar"
         };
-        var result = obj.CreateDbValues(false);
+        var resultValues = obj.ExtractDbColumnValues();
+        var resultColumns = obj.ExtractDbColumnNames(false);
 
-        Assert.Collection(result,
-            (x) => { Assert.Equal(nameof(TestObject.Id), x.Key); Assert.Equal(obj.Id, x.Value); },
-            (x) => { Assert.Equal(nameof(TestObject.PublicName), x.Key); Assert.Equal(obj.PublicName, x.Value); },
-            (x) => { Assert.Equal(nameof(TestObject.Flag), x.Key); Assert.Equal(obj.Flag, x.Value); }
+        Assert.Collection(resultColumns,
+            (x) => Assert.Equal(nameof(TestObject.Id), x),
+            (x) => Assert.Equal(nameof(TestObject.PublicName), x),
+            (x) => Assert.Equal(nameof(TestObject.Flag), x)
+        );
+
+        Assert.Collection(resultValues,
+            (x) => { Assert.Equal(obj.Id, x); },
+            (x) => { Assert.Equal(obj.PublicName, x); },
+            (x) => { Assert.Equal(obj.Flag, x); }
         );
     }
 
@@ -35,12 +42,19 @@ public class ClickHouseBulkModelExtensionsTests
             Flag = true,
             PublicField = "Bar"
         };
-        var result = obj.CreateDbValues(true);
+        var resultValues = obj.ExtractDbColumnValues();
+        var resultColumns = obj.ExtractDbColumnNames(true);
 
-        Assert.Collection(result,
-            (x) => { Assert.Equal("id", x.Key); Assert.Equal(obj.Id, x.Value); },
-            (x) => { Assert.Equal("publicName", x.Key); Assert.Equal(obj.PublicName, x.Value); },
-            (x) => { Assert.Equal("flag", x.Key); Assert.Equal(obj.Flag, x.Value); }
+        Assert.Collection(resultColumns,
+            (x) => Assert.Equal("id", x),
+            (x) => Assert.Equal("publicName", x),
+            (x) => Assert.Equal("flag", x)
+        );
+
+        Assert.Collection(resultValues,
+            (x) => Assert.Equal(obj.Id, x),
+            (x) => Assert.Equal(obj.PublicName, x),
+            (x) => Assert.Equal(obj.Flag, x)
         );
     }
 

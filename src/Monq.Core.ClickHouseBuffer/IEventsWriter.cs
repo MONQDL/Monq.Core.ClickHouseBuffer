@@ -1,3 +1,4 @@
+using Monq.Core.ClickHouseBuffer.Schemas;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -9,10 +10,11 @@ namespace Monq.Core.ClickHouseBuffer;
 public interface IEventsWriter
 {
     /// <summary>
-    /// Write events to database.
+    /// WriteBatch events to database.
     /// </summary>
     /// <param name="events">List of events to record in ClickHouse.</param>
-    /// <param name="tableName">The table.</param>
+    /// <param name="key">The table name and the <paramref name="events"/> type.</param>
     /// <returns><see cref="Task"/> when the operation completes.</returns>
-    Task Write(IEnumerable<EventItem> events, string tableName);
+    /// <returns></returns>
+    Task WriteBatch(IEnumerable<EventItem> events, TypeTuple key);
 }

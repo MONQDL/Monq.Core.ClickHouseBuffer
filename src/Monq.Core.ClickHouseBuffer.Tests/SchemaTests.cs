@@ -12,7 +12,7 @@ public class SchemaTests
     {
         ClickHouseSchemaConfig.GlobalSettings.Scan(this.GetType().Assembly);
 
-        Assert.Equal(2, ClickHouseSchemaConfig.RulesMap.Count);
+        Assert.Equal(2, ClickHouseSchemaConfig.GlobalSettings.RulesMap.Count);
     }
 
     [Fact]
@@ -21,7 +21,7 @@ public class SchemaTests
         ClickHouseSchemaConfig.GlobalSettings.Scan(this.GetType().Assembly);
         ClickHouseSchemaConfig.GlobalSettings.Scan(this.GetType().Assembly);
 
-        Assert.Equal(2, ClickHouseSchemaConfig.RulesMap.Count);
+        Assert.Equal(2, ClickHouseSchemaConfig.GlobalSettings.RulesMap.Count);
     }
 
     [Fact]
