@@ -1,7 +1,6 @@
 using BenchmarkDotNet.Attributes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Monq.Core.ClickHouseBuffer;
 using Monq.Core.ClickHouseBuffer.Impl;
 using Monq.Core.ClickHouseBuffer.Schemas;
 
@@ -22,6 +21,7 @@ public class ClickHouseBenchNew
             new EmptyWriter(),
             500,
             TimeSpan.FromSeconds(2),
+            null,
             null);
     }
 

@@ -3,7 +3,10 @@ using ClickHouse.Client.ADO;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Monq.Core.ClickHouseBuffer.Impl;
+using System;
 
 namespace Monq.Core.ClickHouseBuffer.DependencyInjection;
 
@@ -32,7 +35,17 @@ public static class ServiceCollectionExtensions
 #endif
         services.AddTransient<IEventsWriter, DefaultClickHouseEventsWriter>();
         // Must be singleton.
-        services.AddSingleton<IEventsBufferEngine, EventsBufferEngine>();
+        services.AddSingleton<IEventsBufferEngine, EventsBufferEngine>(sp =>
+        {
+
+            var options = sp.GetRequiredService<IOptions<EngineOptions>>();
+
+            return new EventsBufferEngine(sp.GetRequiredService<IEventsWriter>(),
+                options?.Value?.EventsFlushCount ?? 10000,
+                TimeSpan.FromSeconds(options?.Value?.EventsFlushPeriodSec ?? 2),
+                sp.GetService<IEventsHandler>(),
+                sp.GetService<ILogger<EventsBufferEngine>>());
+        });
 
         return services;
     }

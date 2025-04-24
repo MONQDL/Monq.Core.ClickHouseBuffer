@@ -1,7 +1,6 @@
 using ClickHouse.Client;
 using ClickHouse.Client.ADO;
 using ClickHouse.Client.Copy;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Monq.Core.ClickHouseBuffer.Schemas;
 using System;
@@ -45,7 +44,7 @@ public sealed class DefaultClickHouseEventsWriter : IEventsWriter
         // Get events column names.
         var columns = ClickHouseSchemaConfig.GlobalSettings.GetMappedColumns(key);
 
-        var values = events.Select(x => x.Values.ToArray());
+        var values = events.Select(x => x.Values);
 
         using var bulkCopy = new ClickHouseBulkCopy((ClickHouseConnection)_connection)
         {

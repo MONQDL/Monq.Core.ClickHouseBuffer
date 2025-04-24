@@ -21,7 +21,7 @@ public class TypeAdapterSetter<TSource> : TypeAdapterSetter
     { }
 
     public TypeAdapterSetter<TSource> Map<TSourceMember>(
-        string memberName,
+        string columnName,
         Expression<Func<TSource, TSourceMember>> source)
     {
         this.CheckCompiled();
@@ -36,10 +36,18 @@ public class TypeAdapterSetter<TSource> : TypeAdapterSetter
 
         Settings.Resolvers.Add(new InvokerModel
         {
-            ColumnName = memberName,
+            ColumnName = EnsureWrappedInBackticks(columnName),
             Invoker = invoker,
         });
         return this;
+    }
+
+    static string EnsureWrappedInBackticks(string input)
+    {
+        // Удаляем все апострофы в начале и конце строки
+        string trimmed = input.Trim('`');
+        // Оборачиваем результат в один апостроф с каждой стороны
+        return $"`{trimmed}`";
     }
 }
 

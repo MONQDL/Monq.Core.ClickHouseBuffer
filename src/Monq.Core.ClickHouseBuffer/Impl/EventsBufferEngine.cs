@@ -1,5 +1,4 @@
-using Microsoft.AspNetCore.Components.Web;
-using Monq.Core.ClickHouseBuffer.Exceptions;
+using Microsoft.Extensions.Logging;
 using Monq.Core.ClickHouseBuffer.Extensions;
 using Monq.Core.ClickHouseBuffer.Schemas;
 using System;
@@ -8,7 +7,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using static Microsoft.IO.RecyclableMemoryStreamManager;
 
 namespace Monq.Core.ClickHouseBuffer.Impl;
 
@@ -24,8 +22,13 @@ public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
     readonly TimeSpan _timeLimit;
     readonly IEventsWriter _writer;
     readonly IEventsHandler? _eventsHandler;
+    readonly ILogger<EventsBufferEngine>? _log;
     int _count;
     Task _currentFlushTask = Task.CompletedTask;
+
+    const string _errorWhileWritingEvents = "There was an error while writing events. Details: {ErrorMessage}";
+    const string _errorOnAfterWriteEvents = "There was an error execution OnAfterWriteEvents method. Details: {ErrorMessage}";
+    const string _errorOnWriteErrors = "There was an error execution OnWriteErrors method. Details: {ErrorMessage}";
 
     /// <summary>
     /// The implementation constructor of the event storage buffer.
@@ -34,8 +37,10 @@ public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
     public EventsBufferEngine(IEventsWriter writer,
         int sizeLimit,
         TimeSpan timeLimit,
-        IEventsHandler? eventsHandler)
+        IEventsHandler? eventsHandler,
+        ILogger<EventsBufferEngine>? log)
     {
+        _log = log;
         _writer = writer ?? throw new ArgumentNullException(nameof(writer));
         _eventsHandler = eventsHandler;
         _sizeLimit = sizeLimit;
@@ -139,10 +144,12 @@ public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
             {
                 foreach (var innerEx in task.Exception.InnerExceptions)
                 {
+                    _log?.LogError(innerEx, _errorWhileWritingEvents, innerEx.Message);
                     // Log exception
                     errorEvents.AddRange(eventsGroup);
                 }
-            } else if (!task.IsFaulted)
+            }
+            else if (!task.IsFaulted)
             {
                 completedEvents.AddRange(eventsGroup);
             }
@@ -153,9 +160,9 @@ public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
             if (_eventsHandler != null)
                 await _eventsHandler.OnAfterWriteEvents(completedEvents).ConfigureAwait(false);
         }
-        catch
+        catch (Exception e)
         {
-            // Log OnAfterWriteEvents errors.
+            _log?.LogError(e, _errorOnAfterWriteEvents, e.Message);
         }
 
         try
@@ -163,9 +170,9 @@ public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
             if (_eventsHandler != null)
                 await _eventsHandler.OnWriteErrors(errorEvents).ConfigureAwait(false);
         }
-        catch
+        catch (Exception e)
         {
-            // TODO: Logging.
+            _log?.LogError(e, _errorOnWriteErrors, e.Message);
         }
     }
 
