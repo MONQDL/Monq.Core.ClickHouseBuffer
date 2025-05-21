@@ -1,12 +1,15 @@
+using ClickHouse.Client.Utility;
 using Microsoft.Extensions.Logging;
 using Monq.Core.ClickHouseBuffer.Extensions;
 using Monq.Core.ClickHouseBuffer.Schemas;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using static Microsoft.IO.RecyclableMemoryStreamManager;
 
 namespace Monq.Core.ClickHouseBuffer.Impl;
 
@@ -76,99 +79,116 @@ public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
 
     async Task FlushByTimerAsync()
     {
-        List<EventItem> itemsToFlush;
+        EventItem[]? array = null;
+        int count = 0;
+
         lock (_syncRoot)
         {
-            if (_count == 0) return;
-            itemsToFlush = ExtractItems();
+            if (_count == 0) 
+                return;
+            (array, count) = ExtractItems();
         }
 
-        await ProcessItemsAsync(itemsToFlush).ConfigureAwait(false);
+        await ProcessItemsAsync(array, count).ConfigureAwait(false);
     }
 
     async Task FlushAsync()
     {
-        List<EventItem> itemsToFlush;
+        EventItem[]? array = null;
+        int count = 0;
+
         lock (_syncRoot)
         {
-            itemsToFlush = ExtractItems();
+            (array, count) = ExtractItems();
         }
 
-        await ProcessItemsAsync(itemsToFlush).ConfigureAwait(false);
+        await ProcessItemsAsync(array, count).ConfigureAwait(false);
     }
 
-    List<EventItem> ExtractItems()
+    (EventItem[] Array, int Count) ExtractItems()
     {
         _timer.Change(Timeout.Infinite, Timeout.Infinite);
-        var items = new List<EventItem>(_buffer);
+        int count = _buffer.Count;
+        var array = ArrayPool<EventItem>.Shared.Rent(count);
+
+        _buffer.CopyTo(array, 0);
         _buffer.Clear();
         _count = 0;
-        return items;
+
+        return (array, count);
     }
 
-    async Task ProcessItemsAsync(List<EventItem> events)
+    async Task ProcessItemsAsync(EventItem[] array, int count)
     {
-        var tableGroups = events.GroupBy(x => x.Key);
-        var tasksWithData = new List<(Task Task, IEnumerable<EventItem> Events)>();
-        var tasks = new List<Task>();
-        foreach (var tableGroup in tableGroups)
-        {
-            var task = _writer.WriteBatch(tableGroup, tableGroup.Key);
-            tasks.Add(task);
-            tasksWithData.Add((Task: task, Events: tableGroup.AsEnumerable()));
-        }
-
         try
         {
-            await Task.WhenAll(tasks).ConfigureAwait(false);
-        }
-        catch
-        {
-            // Игнорируем одиночное исключение, так как обработаем все ниже
-        }
-
-        var exceptions = new List<Exception>();
-        var errorEvents = new List<EventItem>();
-        var completedEvents = new List<EventItem>();
-
-        foreach (var tuple in tasksWithData)
-        {
-            var task = tuple.Task;
-            var eventsGroup = tuple.Events;
-
-            if (task.IsFaulted && task.Exception != null)
+            var batch = new ArraySegment<EventItem>(array, 0, count);
+            var tableGroups = batch.GroupBy(x => x.Key);
+            var tasksWithData = new List<(Task Task, IEnumerable<EventItem> Events)>();
+            var tasks = new List<Task>();
+            foreach (var tableGroup in tableGroups)
             {
-                foreach (var innerEx in task.Exception.InnerExceptions)
+                var task = _writer.WriteBatch(tableGroup, tableGroup.Key);
+                tasks.Add(task);
+                tasksWithData.Add((Task: task, Events: tableGroup.AsEnumerable()));
+            }
+
+            try
+            {
+                await Task.WhenAll(tasks).ConfigureAwait(false);
+            }
+            catch
+            {
+                // Игнорируем одиночное исключение, так как обработаем все ниже
+            }
+
+            var exceptions = new List<Exception>();
+            var errorEvents = new List<EventItem>();
+            var completedEvents = new List<EventItem>();
+
+            foreach (var tuple in tasksWithData)
+            {
+                var task = tuple.Task;
+                var eventsGroup = tuple.Events;
+
+                if (task.IsFaulted && task.Exception != null)
                 {
-                    _log?.LogError(innerEx, _errorWhileWritingEvents, innerEx.Message);
-                    // Log exception
-                    errorEvents.AddRange(eventsGroup);
+                    foreach (var innerEx in task.Exception.InnerExceptions)
+                    {
+                        _log?.LogError(innerEx, _errorWhileWritingEvents, innerEx.Message);
+                        // Log exception
+                        errorEvents.AddRange(eventsGroup);
+                    }
+                }
+                else if (!task.IsFaulted)
+                {
+                    completedEvents.AddRange(eventsGroup);
                 }
             }
-            else if (!task.IsFaulted)
+
+            try
             {
-                completedEvents.AddRange(eventsGroup);
+                if (_eventsHandler != null)
+                    await _eventsHandler.OnAfterWriteEvents(completedEvents).ConfigureAwait(false);
+            }
+            catch (Exception e)
+            {
+                _log?.LogError(e, _errorOnAfterWriteEvents, e.Message);
+            }
+
+            try
+            {
+                if (_eventsHandler != null)
+                    await _eventsHandler.OnWriteErrors(errorEvents).ConfigureAwait(false);
+            }
+            catch (Exception e)
+            {
+                _log?.LogError(e, _errorOnWriteErrors, e.Message);
             }
         }
-
-        try
+        finally
         {
-            if (_eventsHandler != null)
-                await _eventsHandler.OnAfterWriteEvents(completedEvents).ConfigureAwait(false);
-        }
-        catch (Exception e)
-        {
-            _log?.LogError(e, _errorOnAfterWriteEvents, e.Message);
-        }
-
-        try
-        {
-            if (_eventsHandler != null)
-                await _eventsHandler.OnWriteErrors(errorEvents).ConfigureAwait(false);
-        }
-        catch (Exception e)
-        {
-            _log?.LogError(e, _errorOnWriteErrors, e.Message);
+            ArrayPool<EventItem>.Shared.Return(array);
         }
     }
 
