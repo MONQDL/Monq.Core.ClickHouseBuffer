@@ -44,11 +44,12 @@ public class SchemaTests
         var columns = e.ClickHouseColumns("logs");
 
         Assert.Collection(columns,
-            x => Assert.Equal("`_rawJson`", x),
-            x => Assert.Equal("`_userspaceId`", x),
-            x => Assert.Equal("`_aggregatedAt`", x),
+            x => Assert.Equal("`_streamId`", x),
             x => Assert.Equal("`_streamName`", x),
-            x => Assert.Equal("`_streamId`", x));
+            x => Assert.Equal("`_aggregatedAt`", x),
+            x => Assert.Equal("`_userspaceId`", x),
+            x => Assert.Equal("`_rawJson`", x),
+            x => Assert.Equal("`_enum`", x));
     }
 
     [Fact]
@@ -75,10 +76,40 @@ public class SchemaTests
         var values = e.ClickHouseValues("logs");
 
         Assert.Collection(values,
-            x => Assert.Equal(rawJson, x),
-            x => Assert.Equal(userspaceId, x),
-            x => Assert.Equal(now, x),
+            x => Assert.Equal(streamId, x),
             x => Assert.Equal(streamName, x),
-            x => Assert.Equal(streamId, x));
+            x => Assert.Equal(now, x),
+            x => Assert.Equal(userspaceId, x),
+            x => Assert.Equal(rawJson, x),
+            x => Assert.Equal(TestEnum.Value, x));
+    }
+
+    [Fact]
+    public void ShouldProperlyGetEmptyStringOfNullStringProperty()
+    {
+        ClickHouseSchemaConfig.GlobalSettings.Scan(this.GetType().Assembly);
+
+        var now = DateTimeOffset.UtcNow;
+        const long userspaceId = 1;
+        const string streamName = "Stream10";
+        const long streamId = 10;
+        var e = new MyEvent()
+        {
+            StreamId = streamId,
+            AggregatedAt = now,
+            StreamName = streamName,
+            UserspaceId = userspaceId,
+            Value = null
+        };
+
+        var values = e.ClickHouseValues("logs");
+
+        Assert.Collection(values,
+            x => Assert.Equal(streamId, x),
+            x => Assert.Equal(streamName, x),
+            x => Assert.Equal(now, x),
+            x => Assert.Equal(userspaceId, x),
+            x => Assert.Equal(string.Empty, x),
+            x => Assert.Equal(TestEnum.Value, x));
     }
 }

@@ -1,7 +1,7 @@
 using Monq.Core.ClickHouseBuffer.Attributes;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
+using System.Linq;
 using System.Reflection;
 
 namespace Monq.Core.ClickHouseBuffer.Extensions;
@@ -11,6 +11,10 @@ namespace Monq.Core.ClickHouseBuffer.Extensions;
 /// </summary>
 public static class ClickHouseBulkModelExtensions
 {
+    const BindingFlags _flags = BindingFlags.Public |
+                              BindingFlags.NonPublic |
+                              BindingFlags.Instance;
+
     /// <summary>
     /// Generate an array of values to be written to columns of the database.
     /// </summary>
@@ -24,28 +28,46 @@ public static class ClickHouseBulkModelExtensions
         var result = new List<object?>();
 
         var objType = obj.GetType();
-        foreach (var prop in objType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
-        {
-            // Ignore column if IgnoreAttribute is present.
-            if (Attribute.GetCustomAttribute(prop, typeof(ClickHouseIgnoreAttribute), true) is ClickHouseIgnoreAttribute)
-                continue;
 
-            var value = prop.GetValue(obj);
-            if (prop.PropertyType.IsEnum)
+        var members = objType
+        .GetMembers(_flags)
+        .Where(m => m.MemberType is MemberTypes.Property or MemberTypes.Field)
+        .Select(m => new
+        {
+            Member = m,
+            Attribute = m.GetCustomAttribute<ClickHouseColumnAttribute>()
+        })
+        .Where(x => x.Attribute != null)
+        .ToList();
+
+        foreach (var member in members)
+        {
+            object? value = null;
+            Type memberType = null!;
+
+            if (member.Member is PropertyInfo property)
             {
-                if (value is null)
-                {
-                    var enumValues = Enum.GetValues(prop.PropertyType);
-                    if (enumValues != null && enumValues.GetValue(0) != null)
-                        value = Enum.ToObject(prop.PropertyType, enumValues!.GetValue(0)!).ToString();
-                    else
-                        value = null;
-                }
-                else
-                    value = Enum.ToObject(prop.PropertyType, value).ToString();
+                memberType = property.PropertyType;
+                var getMethod = property.GetGetMethod(nonPublic: true);
+                value = getMethod?.Invoke(obj, null);
+            }
+            else if (member.Member is FieldInfo field)
+            {
+                memberType = field.FieldType;
+                value = field.GetValue(obj);
             }
 
-            value ??= GetDefaultValue(prop);
+            // Правило 1: Для string заменяем null на пустую строку
+            if (memberType == typeof(string) && value == null)
+            {
+                value = string.Empty;
+            }
+            // Правило 2: Для Enum возвращаем строковое представление
+            else if (memberType.IsEnum || Nullable.GetUnderlyingType(memberType)?.IsEnum == true)
+            {
+                var baseType = Nullable.GetUnderlyingType(memberType) ?? memberType;
+                value = value != null ? Enum.GetName(baseType, value) : null;
+            }
 
             result.Add(value);
         }
@@ -57,45 +79,25 @@ public static class ClickHouseBulkModelExtensions
     /// Generate an array of columns names of the ClickHouse table extracted from object property names.
     /// </summary>
     /// <param name="obj">The object from which the column names array will be extracted.</param>
-    /// <param name="useCamelCase">Flag indicating whether the event should be written to camelCase.</param>
     /// <returns></returns>
-    public static IReadOnlyList<string> ExtractDbColumnNames(this object? obj, bool useCamelCase = true)
+    public static IReadOnlyList<string> ExtractDbColumnNames(this object? obj)
     {
         if (obj is null)
             return Array.Empty<string>();
 
-        var result = new List<string>();
-
         var objType = obj.GetType();
-        foreach (var prop in objType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
-        {
-            // Ignore column if IgnoreAttribute is present.
-            if (Attribute.GetCustomAttribute(prop, typeof(ClickHouseIgnoreAttribute), true) is ClickHouseIgnoreAttribute)
-                continue;
 
-            string colName;
-            if (Attribute.GetCustomAttribute(prop, typeof(ClickHouseColumnAttribute), true) is ClickHouseColumnAttribute clickHouseColumn)
-                colName = clickHouseColumn.Name;
-            else
-                colName = useCamelCase ? prop.Name.ToCamelCase() : prop.Name;
-
-            result.Add(colName);
-        }
-
-        return result;
-    }
-
-    static object? GetDefaultValue(PropertyInfo prop)
-    {
-        if (prop.PropertyType == typeof(string))
-            return (object)string.Empty;
-
-        var defaultAttr = prop.GetCustomAttribute(typeof(DefaultValueAttribute));
-        if (defaultAttr != null)
-            return (defaultAttr as DefaultValueAttribute)?.Value;
-
-        var propertyType = prop.PropertyType;
-        return propertyType.IsValueType ? Activator.CreateInstance(propertyType) : null;
+        return objType
+            .GetMembers(_flags)
+            .Where(m => m.MemberType is MemberTypes.Property or MemberTypes.Field)
+            .Select(m => new
+            {
+                Member = m,
+                Attribute = m.GetCustomAttribute<ClickHouseColumnAttribute>()
+            })
+            .Where(x => x.Attribute != null)
+            .Select(x => x.Attribute!.Name)
+            .ToList();
     }
 
     /// <summary>
@@ -103,12 +105,10 @@ public static class ClickHouseBulkModelExtensions
     /// </summary>
     /// <param name="event">The source event, which will be saved until it persists.</param>
     /// <param name="tableName">Table name in ClickHouse.</param>
-    /// <param name="useCamelCase">User camelCase when extracting ClickHouse column names without attribute <see cref="ClickHouseColumnAttribute"/>.</param>
     /// <returns></returns>
-    public static EventItemWithEventObject CreateFromReflection(this object @event, string tableName, bool useCamelCase)
+    public static EventItemWithEventObject CreateFromReflection(this object @event, string tableName)
     {
         var dbValues = @event.ExtractDbColumnValues();
-        //Columns = dbValues.Keys.Select(val => $"`{val}`").ToList().AsReadOnly();
 
         return new EventItemWithEventObject(@event, @event.GetType(), tableName, dbValues);
     }

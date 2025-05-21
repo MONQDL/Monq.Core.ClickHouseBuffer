@@ -65,17 +65,13 @@ public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
     }
 
     /// <inheritdoc />
-    public void AddSchemaEvent<TSource>([NotNull] TSource @event, string tableName)
+    public void AddEvent<TSource>([NotNull] TSource @event, string tableName)
         where TSource : class
     {
-        Add(new EventItem(tableName, @event.GetType(), @event.ClickHouseValues(tableName)));
-    }
-
-    /// <inheritdoc />
-    public void AddEvent<T>([NotNull] T @event, string tableName, bool useCamelCase = true)
-        where T : class
-    {
-        Add(@event.CreateFromReflection(tableName, useCamelCase));
+        if (@event.SchemaExists(tableName))
+            Add(new EventItem(tableName, @event.GetType(), @event.ClickHouseValues(tableName)));
+        else
+            Add(@event.CreateFromReflection(tableName));
     }
 
     async Task FlushByTimerAsync()

@@ -1,3 +1,4 @@
+using Monq.Core.ClickHouseBuffer.Attributes;
 using Monq.Core.ClickHouseBuffer.Extensions;
 using System;
 using Xunit;
@@ -9,62 +10,87 @@ public class ClickHouseBulkModelExtensionsTests
     [Fact(DisplayName = "Check the correctness of field-value dictionary extraction from the object.")]
     public void ShouldProperlyCreateDbValuesDictionary()
     {
-        var obj = new TestObject
-        {
-            Id = Guid.NewGuid(),
-            PublicName = "Foo",
-            Flag = true,
-            PublicField = "Bar"
-        };
+        var obj = new TestObject();
         var resultValues = obj.ExtractDbColumnValues();
-        var resultColumns = obj.ExtractDbColumnNames(false);
+        var resultColumns = obj.ExtractDbColumnNames();
 
         Assert.Collection(resultColumns,
-            (x) => Assert.Equal(nameof(TestObject.Id), x),
-            (x) => Assert.Equal(nameof(TestObject.PublicName), x),
-            (x) => Assert.Equal(nameof(TestObject.Flag), x)
+            (x) => Assert.Equal("publicProp", x),
+            (x) => Assert.Equal("privateProp", x),
+            (x) => Assert.Equal("publicField", x),
+            (x) => Assert.Equal("privateField", x)
         );
 
         Assert.Collection(resultValues,
-            (x) => { Assert.Equal(obj.Id, x); },
-            (x) => { Assert.Equal(obj.PublicName, x); },
-            (x) => { Assert.Equal(obj.Flag, x); }
+            (x) => { Assert.Equal(obj.PublicProp, x); },
+            (x) => { Assert.Equal(obj.GetPrivateProp(), x); },
+            (x) => { Assert.Equal(obj.PublicField, x); },
+            (x) => { Assert.Equal(obj.GetPrivateField(), x); }
         );
     }
 
-    [Fact(DisplayName = "Check if the field-value dictionary is correctly extracted from the object. Names in camelCase")]
-    public void ShouldProperlyCreateDbValuesDictionary_NamesInCamelCase()
+    [Fact(DisplayName = "Check returning string.Empty of null-string prop value")]
+    public void ShouldProperlyReturnStringEmptyOfNullStringProperty()
     {
-        var obj = new TestObject
-        {
-            Id = Guid.NewGuid(),
-            PublicName = "Foo",
-            Flag = true,
-            PublicField = "Bar"
-        };
+        var obj = new TestObject1();
         var resultValues = obj.ExtractDbColumnValues();
-        var resultColumns = obj.ExtractDbColumnNames(true);
+        var resultColumns = obj.ExtractDbColumnNames();
 
         Assert.Collection(resultColumns,
-            (x) => Assert.Equal("id", x),
-            (x) => Assert.Equal("publicName", x),
-            (x) => Assert.Equal("flag", x)
+            (x) => Assert.Equal("str", x)
         );
 
         Assert.Collection(resultValues,
-            (x) => Assert.Equal(obj.Id, x),
-            (x) => Assert.Equal(obj.PublicName, x),
-            (x) => Assert.Equal(obj.Flag, x)
+            (x) => { Assert.Equal(string.Empty, x); }
+        );
+    }
+
+    [Fact(DisplayName = "Check returning string of enum prop value")]
+    public void ShouldProperlyReturnStringOfEnumPropertyValue()
+    {
+        var obj = new TestObject2();
+        var resultValues = obj.ExtractDbColumnValues();
+        var resultColumns = obj.ExtractDbColumnNames();
+
+        Assert.Collection(resultColumns,
+            (x) => Assert.Equal("str", x)
+        );
+
+        Assert.Collection(resultValues,
+            (x) => { Assert.Equal(TestEnum.Value.ToString(), x); }
         );
     }
 
     class TestObject
     {
-        public Guid Id { get; set; }
-        public string PublicName { get; set; }
-        public bool Flag { get; set; }
-        private string PrivateName { get; set; } = "notVisible";
+        [ClickHouseColumn("publicProp")]
+        public string PublicProp { get; set; } = Guid.NewGuid().ToString();
 
-        public string PublicField;
+        [ClickHouseColumn("privateProp")]
+        private string PrivateProp { get; set; } = Guid.NewGuid().ToString();
+
+        public string GetPrivateProp() => PrivateProp;
+
+        [ClickHouseColumn("publicField")]
+        public string PublicField = Guid.NewGuid().ToString();
+
+        [ClickHouseColumn("privateField")]
+        private string _privateField = Guid.NewGuid().ToString();
+
+        public string GetPrivateField() => _privateField;
+
+        public string IgnoredProp { get; set; } = Guid.NewGuid().ToString();
+    }
+
+    class TestObject1
+    {
+        [ClickHouseColumn("str")]
+        public string? Str { get; set; } = null;
+    }
+
+    class TestObject2
+    {
+        [ClickHouseColumn("str")]
+        public TestEnum? Str { get; set; } = TestEnum.Value;
     }
 }

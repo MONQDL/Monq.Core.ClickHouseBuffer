@@ -5,7 +5,7 @@ namespace Monq.Core.ClickHouseBuffer.Attributes;
 /// <summary>
 /// Use this attribute if the ClickHouse column name is different that class property name.
 /// </summary>
-[AttributeUsage(AttributeTargets.Property)]
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
 public class ClickHouseColumnAttribute : Attribute
 {
     /// <summary>

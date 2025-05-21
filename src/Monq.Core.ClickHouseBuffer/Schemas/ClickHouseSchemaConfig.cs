@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Security.AccessControl;
 
 namespace Monq.Core.ClickHouseBuffer.Schemas;
 
@@ -41,13 +42,20 @@ public class ClickHouseSchemaConfig
                 .Select(x =>
                 {
                     var fn = (Func<TSource, object>)x.Invoker!;
-                    return fn(source);
+                    var result = fn(source);
+                    if (x.PropertyType == typeof(string) && result == null)
+                        return string.Empty;
+                    else
+                        return result;
                 })
                 .ToArray();
         }
         else
             throw new Exception($"The type map \"{sourceType.Name}\" to \"{tableName}\" was not found");
     }
+
+    public bool SchemaExists<TSource>(string tableName) =>
+        _rulesMap.ContainsKey(new TypeTuple(typeof(TSource), tableName));
 
     public string[] GetMappedColumns<TSource>(TSource? source, string tableName)
     {

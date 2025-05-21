@@ -34,10 +34,11 @@ public class TypeAdapterSetter<TSource> : TypeAdapterSetter
 
         var invoker = convertedExpr.Compile();
 
-        Settings.Resolvers.Add(new InvokerModel
+        Settings.Resolvers.Enqueue(new InvokerModel
         {
             ColumnName = EnsureWrappedInBackticks(columnName),
             Invoker = invoker,
+            PropertyType = typeof(TSourceMember)
         });
         return this;
     }

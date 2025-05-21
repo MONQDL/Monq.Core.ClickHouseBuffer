@@ -4,9 +4,9 @@ namespace Monq.Core.ClickHouseBuffer.Schemas;
 
 public class TypeAdapterSettings
 {
-    private readonly ConcurrentBag<InvokerModel> _resolvers = new ConcurrentBag<InvokerModel>();
+    private readonly ConcurrentQueue<InvokerModel> _resolvers = new ConcurrentQueue<InvokerModel>();
 
-    public ConcurrentBag<InvokerModel> Resolvers => _resolvers;
+    public ConcurrentQueue<InvokerModel> Resolvers => _resolvers;
 
     internal bool Compiled { get; set; }
 }

@@ -11,7 +11,8 @@ public class MyFullSchemaConfig : ITableSchema
             .Map("_streamName", x => x.StreamName)
             .Map("_aggregatedAt", x => x.AggregatedAt)
             .Map("_userspaceId", x => x.UserspaceId)
-            .Map("_rawJson", x => x.Value);
+            .Map("_rawJson", x => x.Value)
+            .Map("_enum", x => x.EnumValue);
     }
 }
 
