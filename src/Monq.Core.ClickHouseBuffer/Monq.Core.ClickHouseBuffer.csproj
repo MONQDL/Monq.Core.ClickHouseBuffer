@@ -15,7 +15,7 @@
     <PackageTags>clickhouse buffer</PackageTags>
     <PackageProjectUrl>https://github.com/MONQDL/Monq.Core.ClickHouseBuffer</PackageProjectUrl>
     <RepositoryUrl>https://github.com/MONQDL/Monq.Core.ClickHouseBuffer</RepositoryUrl>
-    <Description>The Clickhouse buffer can collect and write rows with batches (time based or count based).</Description>
+    <Description>The Clickhouse buffer can collect and write rows to tables with batches (time based or count based).</Description>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

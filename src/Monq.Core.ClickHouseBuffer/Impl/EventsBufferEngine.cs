@@ -1,15 +1,15 @@
-using ClickHouse.Client.Utility;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ObjectPool;
 using Monq.Core.ClickHouseBuffer.Extensions;
 using Monq.Core.ClickHouseBuffer.Schemas;
 using System;
 using System.Buffers;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using static Microsoft.IO.RecyclableMemoryStreamManager;
 
 namespace Monq.Core.ClickHouseBuffer.Impl;
 
@@ -84,7 +84,7 @@ public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
 
         lock (_syncRoot)
         {
-            if (_count == 0) 
+            if (_count == 0)
                 return;
             (array, count) = ExtractItems();
         }
@@ -120,31 +120,31 @@ public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
 
     async Task ProcessItemsAsync(EventItem[] array, int count)
     {
+        List<EventItem>? errorEvents = null;
+        List<EventItem>? completedEvents = null;
+
         try
         {
             var batch = new ArraySegment<EventItem>(array, 0, count);
-            var tableGroups = batch.GroupBy(x => x.Key);
+            var tableGroups = GroupByKey(batch);
             var tasksWithData = new List<(Task Task, IEnumerable<EventItem> Events)>();
             var tasks = new List<Task>();
             foreach (var tableGroup in tableGroups)
             {
-                var task = _writer.WriteBatch(tableGroup, tableGroup.Key);
+                var task = _writer.WriteBatch(tableGroup.Items, tableGroup.Key);
                 tasks.Add(task);
-                tasksWithData.Add((Task: task, Events: tableGroup.AsEnumerable()));
+                tasksWithData.Add((Task: task, Events: tableGroup.Items.AsEnumerable()));
             }
 
             try
             {
-                await Task.WhenAll(tasks).ConfigureAwait(false);
+                if (tasks.Count > 0)
+                    await Task.WhenAll(tasks).ConfigureAwait(false);
             }
             catch
             {
-                // Игнорируем одиночное исключение, так как обработаем все ниже
+                // Ignore the single exception, as we'll handle everything below.
             }
-
-            var exceptions = new List<Exception>();
-            var errorEvents = new List<EventItem>();
-            var completedEvents = new List<EventItem>();
 
             foreach (var tuple in tasksWithData)
             {
@@ -153,6 +153,7 @@ public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
 
                 if (task.IsFaulted && task.Exception != null)
                 {
+                    errorEvents ??= new List<EventItem>();
                     foreach (var innerEx in task.Exception.InnerExceptions)
                     {
                         _log?.LogError(innerEx, _errorWhileWritingEvents, innerEx.Message);
@@ -160,35 +161,67 @@ public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
                         errorEvents.AddRange(eventsGroup);
                     }
                 }
-                else if (!task.IsFaulted)
+                else if (!task.IsFaulted && _eventsHandler != null)
                 {
+                    completedEvents ??= new List<EventItem>();
                     completedEvents.AddRange(eventsGroup);
                 }
-            }
-
-            try
-            {
-                if (_eventsHandler != null)
-                    await _eventsHandler.OnAfterWriteEvents(completedEvents).ConfigureAwait(false);
-            }
-            catch (Exception e)
-            {
-                _log?.LogError(e, _errorOnAfterWriteEvents, e.Message);
-            }
-
-            try
-            {
-                if (_eventsHandler != null)
-                    await _eventsHandler.OnWriteErrors(errorEvents).ConfigureAwait(false);
-            }
-            catch (Exception e)
-            {
-                _log?.LogError(e, _errorOnWriteErrors, e.Message);
             }
         }
         finally
         {
             ArrayPool<EventItem>.Shared.Return(array);
+        }
+
+        try
+        {
+            if (_eventsHandler != null)
+                await _eventsHandler.OnAfterWriteEvents(completedEvents ?? Enumerable.Empty<EventItem>()).ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            _log?.LogError(e, _errorOnAfterWriteEvents, e.Message);
+        }
+
+        try
+        {
+            if (_eventsHandler != null && errorEvents != null && errorEvents.Count > 0)
+                await _eventsHandler.OnWriteErrors(errorEvents).ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            _log?.LogError(e, _errorOnWriteErrors, e.Message);
+        }
+    }
+
+    IEnumerable<GroupData> GroupByKey(ArraySegment<EventItem> batch)
+    {
+        var groups = DictionaryPool<TypeTuple, List<EventItem>>.Rent();
+        try
+        {
+            for (int i = 0; i < batch.Count; i++)
+            {
+                var item = batch.Array[batch.Offset + i];
+                if (!groups.TryGetValue(item.Key, out var list))
+                {
+                    list = ListPool<EventItem>.Rent();
+                    groups[item.Key] = list;
+                }
+                list.Add(item);
+            }
+
+            foreach (var pair in groups)
+            {
+                yield return new GroupData(pair.Key, pair.Value.ToArray());
+            }
+        }
+        finally
+        {
+            foreach (var list in groups.Values)
+            {
+                ListPool<EventItem>.Return(list);
+            }
+            DictionaryPool<TypeTuple, List<EventItem>>.Return(groups);
         }
     }
 
@@ -209,5 +242,57 @@ public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
     {
         _timer?.Dispose();
         GC.SuppressFinalize(this);
+    }
+
+    readonly struct GroupData
+    {
+        public readonly TypeTuple Key;
+        public readonly EventItem[] Items;
+
+        public GroupData(TypeTuple key, EventItem[] items)
+        {
+            Key = key;
+            Items = items;
+        }
+    }
+}
+
+public static class ListPool<T>
+{
+    static readonly ObjectPool<List<T>> _pool =
+        new DefaultObjectPool<List<T>>(new ListPolicy<T>());
+
+    public static List<T> Rent() => _pool.Get();
+    public static void Return(List<T> list) => _pool.Return(list);
+
+    class ListPolicy<T> : PooledObjectPolicy<List<T>>
+    {
+        public override List<T> Create() => new List<T>();
+        public override bool Return(List<T> list)
+        {
+            list.Clear();
+            return true;
+        }
+    }
+}
+
+public static class DictionaryPool<TKey, TValue>
+    where TKey: notnull
+{
+    static readonly ConcurrentBag<Dictionary<TKey, TValue>> _pool = new();
+
+    public static Dictionary<TKey, TValue> Rent()
+    {
+        if (_pool.TryTake(out var dict))
+        {
+            return dict;
+        }
+        return new Dictionary<TKey, TValue>();
+    }
+
+    public static void Return(Dictionary<TKey, TValue> dict)
+    {
+        dict.Clear();
+        _pool.Add(dict);
     }
 }

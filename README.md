@@ -2,7 +2,7 @@
 
 *English*
 
-The Clickhouse buffer library can collect and write rows with batches (time based or count based).
+The Clickhouse buffer library can collect and write rows to tables with batches (time based or count based).
 
 As you know, ClickHouse inserts the data being written in a batch manner, and if you perform inserts one at a time,
 then ClickHouse will start to eat up CPU time and consume IO of the disk subsystem at a very high rate.
