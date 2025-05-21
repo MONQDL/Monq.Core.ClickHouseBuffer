@@ -57,12 +57,12 @@ public static class ClickHouseBulkModelExtensions
                 value = field.GetValue(obj);
             }
 
-            // Правило 1: Для string заменяем null на пустую строку
+            // Rule 1: For a string, replace null with an empty string.
             if (memberType == typeof(string) && value == null)
             {
                 value = string.Empty;
             }
-            // Правило 2: Для Enum возвращаем строковое представление
+            // Rule 2: For Enum, we return the string representation
             else if (memberType.IsEnum || Nullable.GetUnderlyingType(memberType)?.IsEnum == true)
             {
                 var baseType = Nullable.GetUnderlyingType(memberType) ?? memberType;
