@@ -255,44 +255,44 @@ public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
             Items = items;
         }
     }
-}
 
-public static class ListPool<T>
-{
-    static readonly ObjectPool<List<T>> _pool =
-        new DefaultObjectPool<List<T>>(new ListPolicy<T>());
-
-    public static List<T> Rent() => _pool.Get();
-    public static void Return(List<T> list) => _pool.Return(list);
-
-    class ListPolicy<T> : PooledObjectPolicy<List<T>>
+    static class ListPool<T>
     {
-        public override List<T> Create() => new List<T>();
-        public override bool Return(List<T> list)
+        static readonly ObjectPool<List<T>> _pool =
+            new DefaultObjectPool<List<T>>(new ListPolicy<T>());
+
+        public static List<T> Rent() => _pool.Get();
+        public static void Return(List<T> list) => _pool.Return(list);
+
+        class ListPolicy<T> : PooledObjectPolicy<List<T>>
         {
-            list.Clear();
-            return true;
+            public override List<T> Create() => new List<T>();
+            public override bool Return(List<T> list)
+            {
+                list.Clear();
+                return true;
+            }
         }
     }
-}
 
-public static class DictionaryPool<TKey, TValue>
-    where TKey: notnull
-{
-    static readonly ConcurrentBag<Dictionary<TKey, TValue>> _pool = new();
-
-    public static Dictionary<TKey, TValue> Rent()
+    static class DictionaryPool<TKey, TValue>
+        where TKey : notnull
     {
-        if (_pool.TryTake(out var dict))
+        static readonly ConcurrentBag<Dictionary<TKey, TValue>> _pool = new();
+
+        public static Dictionary<TKey, TValue> Rent()
         {
-            return dict;
+            if (_pool.TryTake(out var dict))
+            {
+                return dict;
+            }
+            return new Dictionary<TKey, TValue>();
         }
-        return new Dictionary<TKey, TValue>();
-    }
 
-    public static void Return(Dictionary<TKey, TValue> dict)
-    {
-        dict.Clear();
-        _pool.Add(dict);
+        public static void Return(Dictionary<TKey, TValue> dict)
+        {
+            dict.Clear();
+            _pool.Add(dict);
+        }
     }
 }

@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Monq.Core.ClickHouseBuffer.Tests;
 
-public class ClickHouseBulkModelExtensionsTests
+public class ReflectionBasedModelExtensionsTests
 {
     [Fact(DisplayName = "Check the correctness of field-value dictionary extraction from the object.")]
     public void ShouldProperlyCreateDbValuesDictionary()

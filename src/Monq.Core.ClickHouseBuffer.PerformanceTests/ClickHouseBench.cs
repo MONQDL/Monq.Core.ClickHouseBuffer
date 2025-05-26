@@ -51,7 +51,7 @@ public class ClickHouseBench
     {
         var now = DateTimeOffset.UtcNow;
         var streamName = "Stream10";
-        var table = "logb";
+        var table = "logb"; // different table name, so schema not found and reflection will be used.
         foreach (var item in Enumerable.Range(1, 10000).Select(x => new MyEvent()
         {
             StreamId = 10,

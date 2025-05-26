@@ -10,34 +10,95 @@ using System;
 
 namespace Monq.Core.ClickHouseBuffer.DependencyInjection;
 
+/// <summary>
+/// The extensions for IServiceCollection to configure ClickHouseBuffer.
+/// </summary>
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Configuring the ClickHouse buffer engine.
+    /// Configuring the ClickHouse buffer engine using options from <paramref name="configuration"/>.
     /// </summary>
     /// <param name="services">Service collection.</param>
     /// <param name="configuration">IConfiguration section with engine options, configured.</param>
-    /// <param name="clickHouseConnectionString">ClickHouse connection string.</param>
     /// <returns></returns>
     public static IServiceCollection ConfigureCHBuffer(
         this IServiceCollection services,
-        IConfiguration configuration,
-        string clickHouseConnectionString)
+        IConfiguration configuration)
     {
         services.AddOptions();
 
-        services.Configure<EngineOptions>(configuration);
-        services.Configure<EngineOptions>(c => c.ConnectionString = clickHouseConnectionString);
+        var cfg = new EngineOptions();
+
+        configuration.Bind(cfg);
+        services.TryAddSingleton(cfg);
+
+        services.ConfigureCHBufferCore(cfg);
+
+        return services;
+    }
+
+    /// <summary>
+    /// Configuring the ClickHouse buffer engine using action <paramref name="options"/>.
+    /// </summary>
+    /// <param name="services">Service collection.</param>
+    /// <param name="options">The action that can be used to configure ClickHouseBuffer..</param>
+    /// <returns></returns>
+    public static IServiceCollection ConfigureCHBuffer(
+        this IServiceCollection services,
+        Action<EngineOptions> options)
+    {
+        services.AddOptions();
+
+        var cfg = new EngineOptions();
+
+        options(cfg);
+        services.TryAddSingleton(cfg);
+
+        services.ConfigureCHBufferCore(cfg);
+
+        return services;
+    }
+
+    /// <summary>
+    /// Configuring the ClickHouse buffer engine just using connection string.
+    /// </summary>
+    /// <param name="services">Service collection.</param>
+    /// <param name="connectionString">ClickHouse connection string.</param>
+    /// <returns></returns>
+    public static IServiceCollection ConfigureCHBuffer(
+        this IServiceCollection services,
+        string connectionString)
+    {
+        services.AddOptions();
+
+        var cfg = new EngineOptions()
+        {
+            ConnectionString = connectionString
+        };
+
+        services.TryAddSingleton(cfg);
+
+        services.ConfigureCHBufferCore(cfg);
+
+        return services;
+    }
+
+    static IServiceCollection ConfigureCHBufferCore(
+        this IServiceCollection services,
+        EngineOptions configuration)
+    {
+        if (!string.IsNullOrEmpty(configuration.ConnectionString))
+        {
 #if NET8_0_OR_GREATER
-        services.AddClickHouseDataSource(clickHouseConnectionString);
+            services.AddClickHouseDataSource(configuration.ConnectionString);
 #else
-        services.TryAddTransient<IClickHouseConnection>((s) => new ClickHouseConnection(clickHouseConnectionString));
+        services.TryAddTransient<IClickHouseConnection>((s) => new ClickHouseConnection(configuration.ConnectionString));
 #endif
-        services.AddTransient<IEventsWriter, DefaultClickHouseEventsWriter>();
+        }
+        services.TryAddTransient<IEventsWriter, DefaultClickHouseEventsWriter>();
         // Must be singleton.
         services.AddSingleton<IEventsBufferEngine, EventsBufferEngine>(sp =>
         {
-
             var options = sp.GetRequiredService<IOptions<EngineOptions>>();
 
             return new EventsBufferEngine(sp.GetRequiredService<IEventsWriter>(),

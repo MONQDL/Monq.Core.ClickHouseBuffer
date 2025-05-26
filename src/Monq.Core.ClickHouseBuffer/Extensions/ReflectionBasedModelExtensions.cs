@@ -7,9 +7,9 @@ using System.Reflection;
 namespace Monq.Core.ClickHouseBuffer.Extensions;
 
 /// <summary>
-/// A class extension to work with ClickHouse.
+/// A reflection-based model extensions.
 /// </summary>
-public static class ClickHouseBulkModelExtensions
+public static class ReflectionBasedModelExtensions
 {
     const BindingFlags _flags = BindingFlags.Public |
                               BindingFlags.NonPublic |
@@ -101,15 +101,28 @@ public static class ClickHouseBulkModelExtensions
     }
 
     /// <summary>
-    /// Creates an object of <see cref="EventItemWithEventObject"/>. The column values are extracting from object by reading property values by reflection.
+    /// Creates an object of <see cref="EventItemWithSourceObject"/>. The column values are extracting from object by reading property values by reflection.
     /// </summary>
     /// <param name="event">The source event, which will be saved until it persists.</param>
     /// <param name="tableName">Table name in ClickHouse.</param>
     /// <returns></returns>
-    public static EventItemWithEventObject CreateFromReflection(this object @event, string tableName)
+    public static EventItemWithSourceObject CreateFromReflectionWithSource(this object @event, string tableName)
     {
         var dbValues = @event.ExtractDbColumnValues();
 
-        return new EventItemWithEventObject(@event, @event.GetType(), tableName, dbValues);
+        return new EventItemWithSourceObject(@event, tableName, @event.GetType(), dbValues);
+    }
+
+    /// <summary>
+    /// Creates an object of <see cref="EventItem"/>. The column values are extracting from object by reading property values by reflection.
+    /// </summary>
+    /// <param name="event">The source event, which will be saved until it persists.</param>
+    /// <param name="tableName">Table name in ClickHouse.</param>
+    /// <returns></returns>
+    public static EventItem CreateFromReflection(this object @event, string tableName)
+    {
+        var dbValues = @event.ExtractDbColumnValues();
+
+        return new EventItem(tableName, @event.GetType(), dbValues);
     }
 }

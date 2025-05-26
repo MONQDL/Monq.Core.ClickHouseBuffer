@@ -6,7 +6,12 @@ namespace Monq.Core.ClickHouseBuffer;
 public sealed class EngineOptions
 {
     /// <summary>
-    /// Event reset (recording) period in the database (seconds)ю
+    /// Connection string in ClickHouse.
+    /// </summary>
+    public string? ConnectionString { get; set; }
+
+    /// <summary>
+    /// Source reset (recording) period in the database (seconds).
     /// Default: 2 sec.
     /// </summary>
     public int EventsFlushPeriodSec { get; set; } = 2;
@@ -18,13 +23,12 @@ public sealed class EngineOptions
     public int EventsFlushCount { get; set; } = 10000;
 
     /// <summary>
-    /// Connection string in ClickHouse.
+    /// The size of objects batch to be saved to ClickHouse used by ClickHouse Batch inserter.
     /// </summary>
-    public string? ConnectionString { get; set; }
+    public int DatabaseBatchSize { get; set; } = 100000;
 
     /// <summary>
-    /// Maximum number of threads that will be used to write data to the database.
-    /// Default: 1.
+    /// The maximum number of parallel processing tasks used by ClickHouse Batch inserter.
     /// </summary>
-    public int MaxDegreeOfParallelism { get; set; } = 1;
+    public int DatabaseMaxDegreeOfParallelism { get; set; } = 1;
 }

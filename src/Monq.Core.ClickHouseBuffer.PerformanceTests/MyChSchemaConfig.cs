@@ -2,7 +2,7 @@ using Monq.Core.ClickHouseBuffer.Schemas;
 
 namespace Monq.Core.ClickHouseBuffer.PerformanceTests;
 
-public class MyFullSchemaConfig : ITableSchema
+public sealed class MyFullSchemaConfig : ITableSchema
 {
     public void Register(ClickHouseSchemaConfig config)
     {

@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 namespace Monq.Core.ClickHouseBuffer;
 
 /// <summary>
-/// Event storage buffer interface.
+/// Source storage buffer interface.
 /// </summary>
 public interface IEventsBufferEngine
 {
@@ -26,7 +26,7 @@ public interface IEventsBufferEngine
     /// or based on attribute <see cref="ClickHouseColumnAttribute"/>.
     /// </summary>
     /// <typeparam name="T">The type of the event to save to the storage.</typeparam>
-    /// <param name="event">Event object to save to ClickHouse.</param>
+    /// <param name="event">Source object to save to ClickHouse.</param>
     /// <param name="tableName">ClickHouse table name to save to.</param>
     void AddEvent<T>([NotNull] T @event, string tableName)
         where T : class;

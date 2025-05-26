@@ -1,18 +1,11 @@
 # Monq.Core.ClickHouseBuffer
 
-*English*
-
-The Clickhouse buffer library can collect and write rows to tables with batches (time based or count based).
+The ClickHouse buffer library can collect and write rows to tables with batches (time based or count based).
 
 As you know, ClickHouse inserts the data being written in a batch manner, and if you perform inserts one at a time,
 then ClickHouse will start to eat up CPU time and consume IO of the disk subsystem at a very high rate.
 In order for ClickHouse to work correctly and quickly, you need to insert data in batches, or reset the accumulated data
 once at a certain time. The library implements such a mechanism.
-
-The current version has sevearal limitations:
-
-1. There is no asynchronous post-processing of events after saving them to the database or upon saving error.
-2. There is no nice handling of write errors.
 
 ## Installation the library
 
@@ -22,223 +15,257 @@ Install-Package Monq.Core.ClickHouseBuffer
 
 ## Using the library
 
-In Program.cs for console applications or in Startup.cs for asp.net, you need to add a buffer configuration method.
+The library is intended for use in systems with dependency injection.
+
+### Dependency injection
+
+Add dependency in Service collection.
 
 ```csharp
-services.ConfigureCHBuffer(Configuration.GetSection(BufferEngineOptions), clickHouseConnectionString);
+builder.Services.ConfigureCHBuffer(clickHouseConnectionString);
 ```
 
-`clickHouseConnectionString` - the databbase connection string that looks like
-
-```
+`clickHouseConnectionString` - the database connection string that looks like `
 Host=clickhouse<-http-host>;Port=80;Username=<user>;Password=<password>;Database=<database>;
-```
+`
 
-### Configuration from the appsettings.json
+The library also supports configuration from IConfiguration. You must provide a section with configuration. 
 
-The library cat use configuration with schema
+appsettings.json example:
 
 ```json
 {
-	"EventsFlushPeriodSec": 2,
-	"EventsFlushCount": 500,
-	"MaxDegreeOfParallelism": 1
+    "bufferOptions":
+    {
+        "ConnectionString": "Host=clickhouse<-http-host>;Port=80;Username=<user>;Password=<password>;Database=<database>;",
+	    "EventsFlushPeriodSec": 2,
+	    "EventsFlushCount": 10000,
+        "DatabaseBatchSize": 100000,
+        "DatabaseMaxDegreeOfParallelism": 1
+    }
 }
 ```
 
-### An example implementation of the Monq.Core.ClickHouseBuffer with RabbitMQCoreClient and BMonq.Core.BasicDotNetMicroservice libraries.
-
-`Program.cs`
+So, if you use IConfiguration configure the library as follows
 
 ```csharp
-.ConfigureServices((hostContext, services) =>
-{
-    var configuration = hostContext.Configuration;
-
-    var clickHouseConnectionString = hostContext.Configuration["ClickHouseConnectionString"];
-
-    services.ConfigureCHBuffer(
-        hostContext.Configuration.GetSection("BufferEngineOptions"), clickHouseConnectionString);
-
-    services
-        .AddRabbitMQCoreClientConsumer(configuration.GetSection("RabbitMq"))
-        .AddHandler<PersistFooHandler>(
-            new[] { "fooEntity.persist" },
-            new ConsumerHandlerOptions
-            {
-                RetryKey = "fooEntity.persist.buffer-retry"
-            });
-})
+builder.Services.ConfigureCHBuffer(Configuration.GetSection("bufferOptions"));
 ```
 
-`PersistFooHandler.cs`
+### Basic usage
+
+To add objects to buffer you must inject `IEventsBufferEngine` at service and use `AddEvent` method.
 
 ```csharp
-using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
-using RabbitMQCoreClient;
-using RabbitMQCoreClient.Models;
-using System.Threading.Tasks;
-
-namespace FooProcessor.Buffer.QueueHandlers
+public class MyService
 {
-    public class PersistFooHandler : MessageHandlerJson<FooEntity>
+    readonly IEventsBufferEngine _engine;
+
+    public MyService(IEventsBufferEngine engine)
     {
-        readonly IEventsBufferEngine<FooEntity> _eventsBufferEngine;
-        readonly ILogger<PersistFooHandler> _logger;
-
-        public PersistFooHandler(
-            IEventsBufferEngine<FooEntity> eventsBufferEngine,
-            ILogger<PersistFooHandler> logger)
-        {
-            _eventsBufferEngine = eventsBufferEngine;
-            _logger = logger;
-        }
-
-        protected override ValueTask OnParseError(string json, JsonException e, RabbitMessageEventArgs args)
-        {
-            var message = $"Error while deserializing json to type {nameof(FooEntity)}.";
-            _logger.LogCritical(message);
-            ErrorMessageRouter.MoveToDeadLetter();
-            return base.OnParseError(json, e, args);
-        }
-
-        protected override Task HandleMessage(FooEntity message, RabbitMessageEventArgs args)
-        {
-            if (message is null)
-                return Task.CompletedTask;
-
-            return _eventsBufferEngine.AddEvent(message, "clickHouseTable");
-        }
+        _engine = engine;
     }
+
+    void Processor() 
+    {
+        ...
+        _engine.AddEvent(item, "table");
+    }
+}
+```
+
+### Defining model mapping
+
+In order to start using the library, you need to decide on an approach to saving data in a ClickHouse. 
+The library supports two modes of mapping properties to table columns: 
+predefined schema and reflection.
+
+Predefined schema is match more memory and GC less consuming mechanism. 
+The performance test on the laptop Intel i9, 16Gb memory:
+
+BenchmarkDotNet v0.14.0, Windows 11 (10.0.26100.3775)
+12th Gen Intel Core i9-12900H, 1 CPU, 20 logical and 14 physical cores
+.NET SDK 9.0.300-preview.0.25177.5
+[Host]     : .NET 8.0.14 (8.0.1425.11118), X64 RyuJIT AVX2
+DefaultJob : .NET 8.0.14 (8.0.1425.11118), X64 RyuJIT AVX2
+| Method                                               | Mean      | Error     | StdDev    | Completed Work Items | Lock Contentions | Gen0      | Gen1      | Gen2    | Allocated |
+|----------------------------------------------------- |----------:|----------:|----------:|---------------------:|-----------------:|----------:|----------:|--------:|----------:|
+| Bench_Schema_TenHundredsEvents_500BufferedEvents     |  2.237 ms | 0.0447 ms | 0.0722 ms |                    - |                - |  488.2813 |  175.7813 |       - |   5.88 MB |
+| Bench_Reflection_TenHundredsEvents_500BufferedEvents | 38.913 ms | 0.7778 ms | 0.7639 ms |                    - |                - | 2428.5714 | 1000.0000 | 71.4286 |  29.49 MB |
+
+#### Mapping Configuration with ClickHouseSchemaConfig.GlobalSettings
+
+Define mapping model properties to column names at global configuration.
+
+Example:
+
+```csharp
+ClickHouseSchemaConfig.GlobalSettings.NewConfig<MyEvent>("logs")
+    .Map("_streamId", x => x.StreamId)
+    .Map("_streamName", x => x.StreamName)
+    .Map("_aggregatedAt", x => x.AggregatedAt)
+    .Map("_userspaceId", x => x.UserspaceId)
+    .Map("_rawJson", x => x.Value);
+```
+
+#### Mapping Configuration With "ITableSchema" Interface
+
+Before using this feature you have to add this line:
+
+```csharp
+ClickHouseSchemaConfig.GlobalSettings.Scan(typeof(ClickHouseBench).Assembly);
+```
+
+With adding above line to your Startup.cs or Program.cs or any other way to run at startup, 
+you can write mapping configs in the destination class that implements ITableSchema interface
+
+Example:
+
+```csharp
+using Monq.Core.ClickHouseBuffer.Schemas;
+
+public sealed class MyFullSchemaConfig : ITableSchema
+{
+    public void Register(ClickHouseSchemaConfig config)
+    {
+        config.NewConfig<MyEvent>("logs")
+            .Map("_streamId", x => x.StreamId)
+            .Map("_streamName", x => x.StreamName)
+            .Map("_aggregatedAt", x => x.AggregatedAt)
+            .Map("_userspaceId", x => x.UserspaceId)
+            .Map("_rawJson", x => x.Value);
+    }
+}
+```
+
+#### Mapping Configuration With Reflection Attribute
+
+If you can't use configuration schema then use reflection attribute `[ClickHouseColumn("fieldName")]`.
+
+Keep in mind that this method is much slower than with the predefined scheme.
+
+Example:
+
+```csharp
+class TestObject
+{
+    [ClickHouseColumn("publicProp")]
+    public string PublicProp { get; set; } = Guid.NewGuid().ToString();
+
+    [ClickHouseColumn("privateProp")]
+    private string PrivateProp { get; set; } = Guid.NewGuid().ToString();
+
+    public string GetPrivateProp() => PrivateProp;
+
+    [ClickHouseColumn("publicField")]
+    public string PublicField = Guid.NewGuid().ToString();
+
+    [ClickHouseColumn("privateField")]
+    private string _privateField = Guid.NewGuid().ToString();
+
+    public string GetPrivateField() => _privateField;
+
+    public string IgnoredProp { get; set; } = Guid.NewGuid().ToString();
 }
 ```
 
 ### Extended configuration
 
-You can define your own repository implementation for processing events to ClickHouse storage.
-
-#### Interfaces
-
-`IPostHandler` - implement this interface and add it to DI if you want to postprocess messages saved to ClickHouse storage.
-Has no default implementation.
-
-Example:
+By default the library uses [ClickHouse.Client](https://github.com/DarkWanderer/ClickHouse.Client) 
+bulk insert to save buffered items. 
+If you need you own implementation then implement the interface `IEventsWriter` and add it to DI:
 
 ```csharp
-public class PostEventHandler : IPostHandler
+builder.Services.AddTransient<IEventsWriter, CustomEventsWriter>();
+```
+
+Implementation example:
+
+```csharp
+internal sealed class DefaultClickHouseEventsWriter : IEventsWriter
 {
-    readonly IQueueService _queueService;
+    readonly IClickHouseConnection _connection;
+    readonly EngineOptions _options;
 
-    public PostEventHandler(IQueueService queueService)
+    public DefaultClickHouseEventsWriter(IClickHouseConnection connection,
+        EngineOptions engineOptions)
     {
-        _queueService = queueService;
-    }
+        _connection = connection;
 
-    public async Task Handle(IEnumerable<EventItem> events)
-    {
-        // implementation
-    }
-}
-```
+        if (engineOptions == null)
+            throw new ArgumentNullException(nameof(engineOptions), $"{nameof(engineOptions)} is null.");
 
-Dependency injection:
-
-```csharp
-services.AddTransient<IPostHandler, PostEventHandler>();
-```
-
-`IErrorEventsHandler` - implement this interface and add it to DI if you want to process messages 
-that had errors while saving to ClickHouse storage. Has no default implementation.
-
-Example:
-
-```csharp
-public class ErrorEventsHandler : IErrorEventsHandler
-{
-    readonly IQueueService _queueService;
-    readonly IOptions<AppOptions> _appOptions;
-
-    public ErrorEventsHandler(IQueueService queueService, IOptions<AppOptions> appOptions)
-    {
-        _queueService = queueService;
-        _appOptions = appOptions;
-    }
-
-    public async Task Handle(IEnumerable<EventItem> events)
-    {
-        // implementation
-    }
-}
-```
-
-Dependency injection:
-
-```csharp
-services.AddTransient<IErrorEventsHandler, ErrorEventsHandler>();
-```
-
-`IPersistRepository` - implement this interface and add it to DI if you want to use custom save to storage logics while saving to ClickHouse storage. 
-There is default implementation of the repository. If you add to DI your own implementation you will override the default one.
-For convenience, you can use the abstract class `BaseRepository`,
-which contains a method for getting a new ClickHouse context and a set of options read from the configuration.
-
-Example:
-
-```csharp
-public class ClickHousePersistRepository : BaseRepository, IPersistRepository
-{
-    /// <inheritdoc />
-    public ClickHousePersistRepository(IOptions<EngineOptions> engineOptions) : base(engineOptions)
-    {
+        _options = engineOptions;
     }
 
     /// <inheritdoc />
-    public async Task WriteBatch(IEnumerable<EventItem> events, string tableName)
+    public async Task WriteBatch(IEnumerable<EventItem> events, TypeTuple key)
     {
-        await using var connection = GetConnection();
+        if (!events.Any())
+            return;
 
-        var eventItems = GetDenormalizeEvents(events, tableName);
+        // Get events column names.
+        var columns = ClickHouseSchemaConfig.GlobalSettings.GetMappedColumns(key);
 
-        var columns = eventItems.Select(x => x.Columns).FirstOrDefault();
-        var values = eventItems.Select(x => x.Values.ToArray());
+        var values = events.Select(x => x.Values);
 
-        using var command = new ClickHouseBulkCopy(connection)
+        using var bulkCopy = new ClickHouseBulkCopy((ClickHouseConnection)_connection)
         {
-            MaxDegreeOfParallelism = Options.MaxDegreeOfParallelism,
-            BatchSize = Options.EventsFlushCount,
-            DestinationTableName = connection.Database + "." + tableName
+            MaxDegreeOfParallelism = _options.DatabaseMaxDegreeOfParallelism,
+            BatchSize = _options.EventsFlushCount,
+            DestinationTableName = _connection.Database + "." + key.TableName,
+            ColumnNames = columns
         };
-        await command.WriteToServerAsync(values, columns);
-    }
 
-    IEnumerable<EventItem> GetDenormalizeEvents(IEnumerable<EventItem> events, string tableName)
-    {
-        var result = new List<EventItem>();
+        // Prepares ClickHouseBulkCopy instance by loading target column types
+        await bulkCopy.InitAsync().ConfigureAwait(false);
 
-        foreach (var @event in events)
-        {
-            var items = ((EtlBuildCreateModel)@event.Event).GetBuilds()
-                .Select(x => new EventItem(x, tableName, @event.UseCamelCase))
-                .ToList();
-
-            result.AddRange(items);
-        }
-        return result;
+        await bulkCopy.WriteToServerAsync(values).ConfigureAwait(false);
     }
 }
 ```
 
-Dependency injection:
+You also can implement `IEventsHandler` to run you methods `OnAfterWriteEvents` or `OnWriteErrors`.
+You must add you custom implementation to DI:
 
 ```csharp
-services.AddTransient<IPersistRepository, ClickHousePersistRepository>();
+builder.Services.AddTransient<IEventsHandler, CustomEventsHandler>();
 ```
 
-#### Attributes
+### Custom EventItem model
 
-The library support property attributes:
+If you need to add custom properties to EventItem model and handle these properties in `IEventsWriter.WriteBatch`
+you can inherit from `EventItem` and use `IEventsBufferEngine.Add`. There is a ready to use class `EventItemWithSourceObject`.
+This class contains the source object on the basis of which an array of columns and values for writing to ClickHouse was calculated.
+Use extension method `IEventsBufferEngine.AddEventWithSourceObject` to add events with source. 
+At `IEventsWriter.WriteBatch` use cast to the class `EventItemWithSourceObject`.
 
-`[ClickHouseColumn("ColumnName")]` - use this attribute if the ClickHouse column name is different that class property name.
+```csharp
+    public async Task WriteBatch(IEnumerable<EventItem> events, TypeTuple key)
+    {
+        ...
+        foreach (EventItem item in events)
+        {
+            if (item is EventItemWithSourceObject eventWithSource)
+            {
+                // Working с item.Source
+            }
+        }
+        ...
+    }
+```
 
-`[ClickHouseIgnore]` - use this attribute if serializer must ignore property while saving the value to database.
+### Migration guide from v2 to v3.
+
+1. Update the library.
+2. Make the transition to the predefined model schema, if possible. If not possible annotate all fields and properties that must be written to DB by attribute `[ClickHouseColumn]`.
+3. Remove attribute `[ClickHouseIgnore]`.
+3. If a custom implementation of IPersistRepository is used, then
+    - `IPersistRepository` rename to на `IEventsWriter`.
+    - Method `public Task WriteBatch(IEnumerable<EventItem> events, string tableName)` rename to `public Task WriteBatch(IEnumerable<EventItem> events, TypeTuple key)`.
+    - To get a list of columns, use the method in `Task WriteBatch`method use: `var columns = ClickHouseSchemaConfig.GlobalSettings.GetMappedColumns(key);`
+    - To get the final list of values to insert data, use: `var values = events.Select(x => x.Values);`
+    - To get the table name, use `key.TableName` instead of `tableName`.
+4. Calls to the `await _eventsBufferEngine.AddEvent()` replace with synchronous`_eventsBufferEngine.AddEvent()`.
+5. If `IErrorEventsHandler` or `IPostHandler` is replace, then merge the implementations to the `IEventsHandler`.
+`IErrorEventsHandler.Handle` moved to `IEventsHandler.OnWriteErrors`, `IPostHandler.Handle` moved to `IEventsHandler.OnAfterWriteEvents`

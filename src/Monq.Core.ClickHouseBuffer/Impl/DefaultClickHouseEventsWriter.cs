@@ -1,7 +1,6 @@
 using ClickHouse.Client;
 using ClickHouse.Client.ADO;
 using ClickHouse.Client.Copy;
-using Microsoft.Extensions.Options;
 using Monq.Core.ClickHouseBuffer.Schemas;
 using System;
 using System.Collections.Generic;
@@ -13,7 +12,7 @@ namespace Monq.Core.ClickHouseBuffer.Impl;
 /// <summary>
 /// Implementation of the service for recording events in the database.
 /// </summary>
-public sealed class DefaultClickHouseEventsWriter : IEventsWriter
+internal sealed class DefaultClickHouseEventsWriter : IEventsWriter
 {
     readonly IClickHouseConnection _connection;
     readonly EngineOptions _options;
@@ -23,16 +22,14 @@ public sealed class DefaultClickHouseEventsWriter : IEventsWriter
     /// Creates a new instance of the class <see cref="DefaultClickHouseEventsWriter"/>.
     /// </summary>
     public DefaultClickHouseEventsWriter(IClickHouseConnection connection,
-        IOptions<EngineOptions> engineOptions)
+        EngineOptions engineOptions)
     {
         _connection = connection;
 
         if (engineOptions == null)
             throw new ArgumentNullException(nameof(engineOptions), $"{nameof(engineOptions)} is null.");
-        if (engineOptions.Value == null)
-            throw new ArgumentNullException(nameof(engineOptions.Value), $"{nameof(engineOptions.Value)} is null.");
 
-        _options = engineOptions.Value;
+        _options = engineOptions;
     }
 
     /// <inheritdoc />
@@ -48,7 +45,7 @@ public sealed class DefaultClickHouseEventsWriter : IEventsWriter
 
         using var bulkCopy = new ClickHouseBulkCopy((ClickHouseConnection)_connection)
         {
-            MaxDegreeOfParallelism = _options.MaxDegreeOfParallelism,
+            MaxDegreeOfParallelism = _options.DatabaseMaxDegreeOfParallelism,
             BatchSize = _options.EventsFlushCount,
             DestinationTableName = _connection.Database + "." + key.TableName,
             ColumnNames = columns

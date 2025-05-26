@@ -34,23 +34,23 @@ public class EventItem
 /// <summary>
 /// The buffer event with the source event.
 /// </summary>
-public class EventItemWithEventObject : EventItem
+public class EventItemWithSourceObject : EventItem
 {
     /// <summary>
-    /// The object of the event that you want to write to the database.
+    /// The source object of the event that you want to write to the storage.
     /// </summary>
-    public object Event { get; }
+    public object Source { get; }
 
     /// <summary>
     /// Buffer event constructor.
     /// </summary>
-    /// <param name="event">Event object.</param>
+    /// <param name="event">Source object.</param>
     /// <param name="tableName">Table name in ClickHouse.</param>
     /// <param name="eventType">The type of the event, based on which the <paramref name="values"/> was created.</param>
     /// <param name="values">Column values for recording an event in CH.</param>
-    public EventItemWithEventObject(object @event, Type eventType, string tableName, object?[] values)
+    public EventItemWithSourceObject(object @event, string tableName, Type eventType, object?[] values)
         : base(tableName, eventType, values)
     {
-        Event = @event;
+        Source = @event;
     }
 }

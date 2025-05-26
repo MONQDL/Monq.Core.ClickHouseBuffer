@@ -6,21 +6,10 @@ namespace Monq.Core.ClickHouseBuffer.Exceptions;
 /// <summary>
 /// Represents errors that occur when the buffer is incorrectly configured.
 /// </summary>
-public class BufferConfigurationException : Exception
+public sealed class BufferConfigurationException : Exception
 {
     /// <summary>Initializes a new instance of the <see cref="BufferConfigurationException" /> class.</summary>
     public BufferConfigurationException()
-    {
-
-    }
-
-    /// <summary>Initializes a new instance of the <see cref="BufferConfigurationException" /> class with serialized data.</summary>
-    /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
-    /// <param name="context">The <see cref="System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
-    /// <exception cref="System.ArgumentNullException">
-    /// <paramref name="info" /> is <see langword="null" />.</exception>
-    /// <exception cref="System.Runtime.Serialization.SerializationException">The class name is <see langword="null" /> or <see cref="System.Exception.HResult" /> is zero (0).</exception>
-    protected BufferConfigurationException(SerializationInfo info, StreamingContext context) : base(info, context)
     {
 
     }

@@ -26,7 +26,7 @@ public class TypeAdapterSetter<TSource> : TypeAdapterSetter
     {
         this.CheckCompiled();
 
-        // Перестраиваем выражение с конвертацией результата в object
+        // Rebuilding the expression with the conversion of the result to an object
         var convertedExpr = Expression.Lambda<Func<TSource, object>>(
             Expression.Convert(source.Body, typeof(object)),
             source.Parameters
@@ -45,9 +45,9 @@ public class TypeAdapterSetter<TSource> : TypeAdapterSetter
 
     static string EnsureWrappedInBackticks(string input)
     {
-        // Удаляем все апострофы в начале и конце строки
+        // Delete all apostrophes at the beginning and end of the line
         string trimmed = input.Trim('`');
-        // Оборачиваем результат в один апостроф с каждой стороны
+        // Wrapping the result in one apostrophe on each side
         return $"`{trimmed}`";
     }
 }
