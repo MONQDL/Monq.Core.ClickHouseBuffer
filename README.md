@@ -232,6 +232,74 @@ You must add you custom implementation to DI:
 builder.Services.AddTransient<IEventsHandler, CustomEventsHandler>();
 ```
 
+### Multiple ClickHouses
+
+In rare cases, you need to use a buffer and write data to different ClickHouse databases.
+In this case, follow the steps: 
+1. Do not pass ConnectionString in the options at Program.cs (`builder.Services.ConfigureCHBuffer`).
+2. Register named ClickHouse configurations using the built-in library ClickHouse.Client (or use custom connections factory) at Program.cs.
+```csharp
+builder.Services.AddClickHouseDataSource(connectionString1, serviceKey: "ch1");
+builder.Services.AddClickHouseDataSource(connectionString2, serviceKey: "ch2");
+```
+3. Perform a custom implementation of the IEventsWriter interface.
+```csharp
+internal sealed class MultipleClickHouseEventsWriter : IEventsWriter
+{
+    readonly IServiceProvider _serviceProvider;
+    readonly EngineOptions _options;
+
+    public MultiClickHouseEventsWriter(IServiceProvider serviceProvider,
+        EngineOptions engineOptions)
+    {
+        _serviceProvider = serviceProvider;
+
+        if (engineOptions == null)
+            throw new ArgumentNullException(nameof(engineOptions), $"{nameof(engineOptions)} is null.");
+
+        _options = engineOptions;
+    }
+
+    /// <inheritdoc />
+    public async Task WriteBatch(IEnumerable<EventItem> events, TypeTuple key)
+    {
+        if (!events.Any())
+            return;
+
+        // Get events column names.
+        var columns = ClickHouseSchemaConfig.GlobalSettings.GetMappedColumns(key);
+
+        var values = events.Select(x => x.Values);
+
+        var connection = GetConnection(key.TableName);
+
+        using var bulkCopy = new ClickHouseBulkCopy(connection)
+        {
+            MaxDegreeOfParallelism = _options.DatabaseMaxDegreeOfParallelism,
+            BatchSize = _options.EventsFlushCount,
+            DestinationTableName = _connection.Database + "." + key.TableName,
+            ColumnNames = columns
+        };
+
+        // Prepares ClickHouseBulkCopy instance by loading target column types
+        await bulkCopy.InitAsync().ConfigureAwait(false);
+
+        await bulkCopy.WriteToServerAsync(values).ConfigureAwait(false);
+    }
+}
+
+ClickHouseConnection GetConnection(string tableName) =>
+        _serviceProvider.GetRequiredKeyedService<ClickHouseConnection>(
+            tableName == "logs"
+                ? "ch1"
+                : "ch2");
+```
+4. Register you custom IEventsWriter implementation in DI.
+```csharp
+// after builder.Services.ConfigureCHBuffer();
+builder.Services.AddTransient<IEventsWriter, MultipleClickHouseEventsWriter>();
+```
+
 ### Custom EventItem model
 
 If you need to add custom properties to EventItem model and handle these properties in `IEventsWriter.WriteBatch`
@@ -267,5 +335,7 @@ At `IEventsWriter.WriteBatch` use cast to the class `EventItemWithSourceObject`.
     - To get the final list of values to insert data, use: `var values = events.Select(x => x.Values);`
     - To get the table name, use `key.TableName` instead of `tableName`.
 4. Calls to the `await _eventsBufferEngine.AddEvent()` replace with synchronous`_eventsBufferEngine.AddEvent()`.
+5. Replace `builder.Services.ConfigureCHBuffer(builder.Configuration.GetSection(BufferEngineOptions), clickHouseConnectionString);` to
+`builder.Services.ConfigureCHBuffer(builder.Configuration.GetSection(AppConstants.Configuration.BufferEngineOptions), x => x.ConnectionString = clickHouseConnectionString!);`
 5. If `IErrorEventsHandler` or `IPostHandler` is replace, then merge the implementations to the `IEventsHandler`.
 `IErrorEventsHandler.Handle` moved to `IEventsHandler.OnWriteErrors`, `IPostHandler.Handle` moved to `IEventsHandler.OnAfterWriteEvents`

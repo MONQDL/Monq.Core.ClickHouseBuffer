@@ -25,13 +25,9 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        services.AddOptions();
-
         var cfg = new EngineOptions();
 
         configuration.Bind(cfg);
-        services.TryAddSingleton(cfg);
-
         services.ConfigureCHBufferCore(cfg);
 
         return services;
@@ -41,19 +37,36 @@ public static class ServiceCollectionExtensions
     /// Configuring the ClickHouse buffer engine using action <paramref name="options"/>.
     /// </summary>
     /// <param name="services">Service collection.</param>
-    /// <param name="options">The action that can be used to configure ClickHouseBuffer..</param>
+    /// <param name="options">The action that can be used to configure ClickHouseBuffer.</param>
     /// <returns></returns>
     public static IServiceCollection ConfigureCHBuffer(
         this IServiceCollection services,
         Action<EngineOptions> options)
     {
-        services.AddOptions();
-
         var cfg = new EngineOptions();
 
         options(cfg);
-        services.TryAddSingleton(cfg);
+        services.ConfigureCHBufferCore(cfg);
 
+        return services;
+    }
+
+    /// <summary>
+    /// Configuring the ClickHouse buffer engine using options from <paramref name="configuration"/> and then apply <paramref name="options"/> action.
+    /// </summary>
+    /// <param name="services">Service collection.</param>
+    /// <param name="configuration">IConfiguration section with engine options, configured.</param>
+    /// <param name="options">The action that can be used to configure ClickHouseBuffer.</param>
+    /// <returns></returns>
+    public static IServiceCollection ConfigureCHBuffer(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        Action<EngineOptions> options)
+    {
+        var cfg = new EngineOptions();
+
+        configuration.Bind(cfg);
+        options(cfg);
         services.ConfigureCHBufferCore(cfg);
 
         return services;
@@ -69,14 +82,10 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         string connectionString)
     {
-        services.AddOptions();
-
         var cfg = new EngineOptions()
         {
             ConnectionString = connectionString
         };
-
-        services.TryAddSingleton(cfg);
 
         services.ConfigureCHBufferCore(cfg);
 
@@ -87,6 +96,10 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         EngineOptions configuration)
     {
+        services.AddOptions();
+
+        services.TryAddSingleton(configuration);
+
         if (!string.IsNullOrEmpty(configuration.ConnectionString))
         {
 #if NET8_0_OR_GREATER
