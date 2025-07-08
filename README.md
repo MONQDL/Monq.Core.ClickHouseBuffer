@@ -35,13 +35,12 @@ appsettings.json example:
 
 ```json
 {
-    "bufferOptions":
-    {
-        "ConnectionString": "Host=clickhouse<-http-host>;Port=80;Username=<user>;Password=<password>;Database=<database>;",
-	    "EventsFlushPeriodSec": 2,
-	    "EventsFlushCount": 10000,
-        "DatabaseBatchSize": 100000,
-        "DatabaseMaxDegreeOfParallelism": 1
+    "bufferOptions": {
+      "ConnectionString": "Host=clickhouse<-http-host>;Port=80;Username=<user>;Password=<password>;Database=<database>;",
+      "EventsFlushPeriodSec": 2,
+      "EventsFlushCount": 10000,
+      "DatabaseBatchSize": 100000,
+      "DatabaseMaxDegreeOfParallelism": 1
     }
 }
 ```
@@ -88,6 +87,7 @@ BenchmarkDotNet v0.14.0, Windows 11 (10.0.26100.3775)
 .NET SDK 9.0.300-preview.0.25177.5
 [Host]     : .NET 8.0.14 (8.0.1425.11118), X64 RyuJIT AVX2
 DefaultJob : .NET 8.0.14 (8.0.1425.11118), X64 RyuJIT AVX2
+
 | Method                                               | Mean      | Error     | StdDev    | Completed Work Items | Lock Contentions | Gen0      | Gen1      | Gen2    | Allocated |
 |----------------------------------------------------- |----------:|----------:|----------:|---------------------:|-----------------:|----------:|----------:|--------:|----------:|
 | Bench_Schema_TenHundredsEvents_500BufferedEvents     |  2.237 ms | 0.0447 ms | 0.0722 ms |                    - |                - |  488.2813 |  175.7813 |       - |   5.88 MB |
@@ -144,6 +144,8 @@ If you can't use configuration schema then use reflection attribute `[ClickHouse
 
 Keep in mind that this method is much slower than with the predefined scheme.
 
+Only columns with attribute `[ClickHouseColumn]` will be pushed to database.
+
 Example:
 
 ```csharp
@@ -173,7 +175,7 @@ class TestObject
 
 By default the library uses [ClickHouse.Client](https://github.com/DarkWanderer/ClickHouse.Client) 
 bulk insert to save buffered items. 
-If you need you own implementation then implement the interface `IEventsWriter` and add it to DI:
+If you need you own implementation then implement the interface `IEventsWriter` and add it to DI after `builder.Services.ConfigureCHBuffer()`:
 
 ```csharp
 builder.Services.AddTransient<IEventsWriter, CustomEventsWriter>();
@@ -306,7 +308,7 @@ If you need to add custom properties to EventItem model and handle these propert
 you can inherit from `EventItem` and use `IEventsBufferEngine.Add`. There is a ready to use class `EventItemWithSourceObject`.
 This class contains the source object on the basis of which an array of columns and values for writing to ClickHouse was calculated.
 Use extension method `IEventsBufferEngine.AddEventWithSourceObject` to add events with source. 
-At `IEventsWriter.WriteBatch` use cast to the class `EventItemWithSourceObject`.
+At `IEventsWriter.WriteBatch` cast to the class `EventItemWithSourceObject`.
 
 ```csharp
     public async Task WriteBatch(IEnumerable<EventItem> events, TypeTuple key)
