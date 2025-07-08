@@ -1,154 +1,298 @@
-﻿using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Monq.Core.ClickHouseBuffer.Exceptions;
-using Newtonsoft.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ObjectPool;
+using Monq.Core.ClickHouseBuffer.Extensions;
+using Monq.Core.ClickHouseBuffer.Schemas;
 using System;
+using System.Buffers;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Monq.Core.ClickHouseBuffer.Impl
+namespace Monq.Core.ClickHouseBuffer.Impl;
+
+/// <summary>
+/// Implementation of the event storage buffer.
+/// </summary>
+public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
 {
+    readonly Queue<EventItem> _buffer = new Queue<EventItem>();
+    readonly object _syncRoot = new object();
+    readonly Timer _timer;
+    readonly int _sizeLimit;
+    readonly TimeSpan _timeLimit;
+    readonly IEventsWriter _writer;
+    readonly IEventsHandler? _eventsHandler;
+    readonly ILogger<EventsBufferEngine>? _log;
+    int _count;
+    Task _currentFlushTask = Task.CompletedTask;
+
+    const string _errorWhileWritingEvents = "There was an error while writing events. Details: {ErrorMessage}";
+    const string _errorOnAfterWriteEvents = "There was an error execution OnAfterWriteEvents method. Details: {ErrorMessage}";
+    const string _errorOnWriteErrors = "There was an error execution OnWriteErrors method. Details: {ErrorMessage}";
+
     /// <summary>
-    /// Implementation of the event storage buffer.
+    /// The implementation constructor of the event storage buffer.
+    /// Creates a new instance of the class <see cref="EventsBufferEngine"/>.
     /// </summary>
-    public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
+    public EventsBufferEngine(IEventsWriter writer,
+        int sizeLimit,
+        TimeSpan timeLimit,
+        IEventsHandler? eventsHandler,
+        ILogger<EventsBufferEngine>? log)
     {
-#pragma warning disable IDE0052 // Delete unread closed members
-        readonly Timer _flushTimer;
-#pragma warning restore IDE0052 // Delete unread closed members
-        readonly List<EventItem> _events = new List<EventItem>();
-        readonly IEventsWriter _eventsWriter;
-        readonly IPostHandler _postHandler;
-        readonly IErrorEventsHandler _errorEventsHandler;
-        readonly EngineOptions _engineOptions;
-        readonly ILogger<EventsBufferEngine> _logger;
+        _log = log;
+        _writer = writer ?? throw new ArgumentNullException(nameof(writer));
+        _eventsHandler = eventsHandler;
+        _sizeLimit = sizeLimit;
+        _timeLimit = timeLimit;
+        _timer = new Timer(_ => _ = FlushByTimerAsync(), null, Timeout.Infinite, Timeout.Infinite);
+    }
 
-        static readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
-
-        /// <summary>
-        /// The implementation constructor of the event storage buffer.
-        /// Creates a new instance of the class <see cref="EventsBufferEngine"/>.
-        /// </summary>
-        public EventsBufferEngine(
-            IOptions<EngineOptions> engineOptions,
-            IEventsWriter eventsWriter,
-            ILogger<EventsBufferEngine> logger,
-            IServiceProvider serviceProvider
-            )
+    /// <inheritdoc />
+    public void Add(EventItem item)
+    {
+        lock (_syncRoot)
         {
-            if (engineOptions == null)
-                throw new ArgumentNullException(nameof(engineOptions), $"{nameof(engineOptions)} is null.");
-            if (engineOptions.Value == null)
-                throw new ArgumentNullException(nameof(engineOptions.Value), $"{nameof(engineOptions.Value)} is null.");
+            _buffer.Enqueue(item);
+            _count++;
 
-            _postHandler = (IPostHandler)serviceProvider.GetService(typeof(IPostHandler));
-            _errorEventsHandler = (IErrorEventsHandler)serviceProvider.GetService(typeof(IErrorEventsHandler));
-            _engineOptions = engineOptions.Value;
-            _eventsWriter = eventsWriter;
-            _logger = logger;
+            if (_count == 1)
+                _timer.Change(_timeLimit, Timeout.InfiniteTimeSpan);
 
-            _flushTimer = new Timer(async obj => await FlushTimerDelegate(obj), null,
-                _engineOptions.EventsFlushPeriodSec * 1000,
-                _engineOptions.EventsFlushPeriodSec * 1000);
+            if (_count >= _sizeLimit)
+                _currentFlushTask = FlushAsync();
+        }
+    }
+
+    /// <inheritdoc />
+    public void AddEvent<TSource>([NotNull] TSource @event, string tableName)
+        where TSource : class
+    {
+        if (@event.SchemaExists(tableName))
+            Add(new EventItem(tableName, @event.GetType(), @event.ClickHouseValues(tableName)));
+        else
+            Add(@event.CreateFromReflection(tableName));
+    }
+
+    async Task FlushByTimerAsync()
+    {
+        EventItem[]? array = null;
+        int count = 0;
+
+        lock (_syncRoot)
+        {
+            if (_count == 0)
+                return;
+            (array, count) = ExtractItems();
         }
 
-        /// <inheritdoc />
-        public async Task AddEvent(object @event, string tableName, bool useCamelCase = true)
+        await ProcessItemsAsync(array, count).ConfigureAwait(false);
+    }
+
+    async Task FlushAsync()
+    {
+        EventItem[]? array = null;
+        int count = 0;
+
+        lock (_syncRoot)
         {
-            await _semaphore.WaitAsync();
-
-            try
-            {
-                _events.Add(new EventItem(@event, tableName, useCamelCase));
-                if (_events.Count < _engineOptions.EventsFlushCount)
-                    return;
-
-                await Flush();
-            }
-            finally
-            {
-                _semaphore.Release();
-            }
+            (array, count) = ExtractItems();
         }
 
-        async Task FlushTimerDelegate(object? _)
+        await ProcessItemsAsync(array, count).ConfigureAwait(false);
+    }
+
+    (EventItem[] Array, int Count) ExtractItems()
+    {
+        _timer.Change(Timeout.Infinite, Timeout.Infinite);
+        int count = _buffer.Count;
+        var array = ArrayPool<EventItem>.Shared.Rent(count);
+
+        _buffer.CopyTo(array, 0);
+        _buffer.Clear();
+        _count = 0;
+
+        return (array, count);
+    }
+
+    async Task ProcessItemsAsync(EventItem[] array, int count)
+    {
+        List<EventItem>? errorEvents = null;
+        List<EventItem>? completedEvents = null;
+
+        try
         {
-            await _semaphore.WaitAsync();
-            try
-            {
-                await Flush();
-            }
-            finally
-            {
-                _semaphore.Release();
-            }
-        }
-
-        Task Flush()
-        {
-            if (_events.Count == 0)
-                return Task.CompletedTask;
-
-            var eventsCache = _events.ToArray();
-            _events.Clear();
-
-            return HandleEvents(eventsCache);
-        }
-
-        async Task HandleEvents(IEnumerable<EventItem> events)
-        {
-            var tableGroups = events.GroupBy(x => x.TableName);
+            var batch = new ArraySegment<EventItem>(array, 0, count);
+            var tableGroups = GroupByKey(batch);
+            var tasksWithData = new List<(Task Task, IEnumerable<EventItem> Events)>();
             var tasks = new List<Task>();
-
             foreach (var tableGroup in tableGroups)
-                tasks.Add(_eventsWriter.Write(tableGroup, tableGroup.Key));
+            {
+                var task = _writer.WriteBatch(tableGroup.Items, tableGroup.Key);
+                tasks.Add(task);
+                tasksWithData.Add((Task: task, Events: tableGroup.Items.AsEnumerable()));
+            }
 
             try
             {
-                await Task.WhenAll(tasks);
-
-                if (_postHandler != null)
-                    await _postHandler.Handle(events);
+                if (tasks.Count > 0)
+                    await Task.WhenAll(tasks).ConfigureAwait(false);
             }
-            catch (Exception e)
+            catch
             {
-                _logger.LogError(e, "Error while trying to write batch of data to Storage.");
+                // Ignore the single exception, as we'll handle everything below.
+            }
 
-                var exceptions = tasks
-                    .Where(t => t.Exception != null)
-                    .Select(t => t.Exception)
-                    .ToList();
+            foreach (var tuple in tasksWithData)
+            {
+                var task = tuple.Task;
+                var eventsGroup = tuple.Events;
 
-                var errorEvents = new List<EventItem>();
-                foreach (var aggregateException in exceptions)
+                if (task.IsFaulted && task.Exception != null)
                 {
-                    var persistException = aggregateException?.InnerExceptions?.First() as PersistingException;
-                    if (persistException != null)
+                    errorEvents ??= new List<EventItem>();
+                    foreach (var innerEx in task.Exception.InnerExceptions)
                     {
-                        var json = JsonConvert.SerializeObject(persistException.Events, Formatting.Indented);
-                        var extendedError = string.Join(Environment.NewLine, new[]
-                        {
-                            $"Table: {persistException.TableName}. Source: ", json
-                        });
-                        _logger.LogDebug(extendedError);
-
-                        errorEvents.AddRange(persistException.Events);
+                        _log?.LogError(innerEx, _errorWhileWritingEvents, innerEx.Message);
+                        // Log exception
+                        errorEvents.AddRange(eventsGroup);
                     }
                 }
-
-                if (_errorEventsHandler != null)
-                    await _errorEventsHandler.Handle(errorEvents);
+                else if (!task.IsFaulted && _eventsHandler != null)
+                {
+                    completedEvents ??= new List<EventItem>();
+                    completedEvents.AddRange(eventsGroup);
+                }
             }
         }
-
-        /// <summary>
-        /// Free up resources.
-        /// </summary>
-        public void Dispose()
+        finally
         {
-            _flushTimer?.Dispose();
+            ArrayPool<EventItem>.Shared.Return(array);
+        }
+
+        try
+        {
+            if (_eventsHandler != null)
+                await _eventsHandler.OnAfterWriteEvents(completedEvents ?? Enumerable.Empty<EventItem>()).ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            _log?.LogError(e, _errorOnAfterWriteEvents, e.Message);
+        }
+
+        try
+        {
+            if (_eventsHandler != null && errorEvents != null && errorEvents.Count > 0)
+                await _eventsHandler.OnWriteErrors(errorEvents).ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            _log?.LogError(e, _errorOnWriteErrors, e.Message);
+        }
+    }
+
+    IEnumerable<GroupData> GroupByKey(ArraySegment<EventItem> batch)
+    {
+        var groups = DictionaryPool<TypeTuple, List<EventItem>>.Rent();
+        try
+        {
+            for (int i = 0; i < batch.Count; i++)
+            {
+                var item = batch.Array[batch.Offset + i];
+                if (!groups.TryGetValue(item.Key, out var list))
+                {
+                    list = ListPool<EventItem>.Rent();
+                    groups[item.Key] = list;
+                }
+                list.Add(item);
+            }
+
+            foreach (var pair in groups)
+            {
+                yield return new GroupData(pair.Key, pair.Value.ToArray());
+            }
+        }
+        finally
+        {
+            foreach (var list in groups.Values)
+            {
+                ListPool<EventItem>.Return(list);
+            }
+            DictionaryPool<TypeTuple, List<EventItem>>.Return(groups);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task CompleteAsync()
+    {
+        Task flushTask;
+        lock (_syncRoot)
+        {
+            flushTask = _currentFlushTask;
+        }
+
+        await flushTask.ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        _timer?.Dispose();
+        GC.SuppressFinalize(this);
+    }
+
+    readonly struct GroupData
+    {
+        public readonly TypeTuple Key;
+        public readonly EventItem[] Items;
+
+        public GroupData(TypeTuple key, EventItem[] items)
+        {
+            Key = key;
+            Items = items;
+        }
+    }
+
+    static class ListPool<T>
+    {
+        static readonly ObjectPool<List<T>> _pool =
+            new DefaultObjectPool<List<T>>(new ListPolicy<T>());
+
+        public static List<T> Rent() => _pool.Get();
+        public static void Return(List<T> list) => _pool.Return(list);
+
+        class ListPolicy<T> : PooledObjectPolicy<List<T>>
+        {
+            public override List<T> Create() => new List<T>();
+            public override bool Return(List<T> list)
+            {
+                list.Clear();
+                return true;
+            }
+        }
+    }
+
+    static class DictionaryPool<TKey, TValue>
+        where TKey : notnull
+    {
+        static readonly ConcurrentBag<Dictionary<TKey, TValue>> _pool = new();
+
+        public static Dictionary<TKey, TValue> Rent()
+        {
+            if (_pool.TryTake(out var dict))
+            {
+                return dict;
+            }
+            return new Dictionary<TKey, TValue>();
+        }
+
+        public static void Return(Dictionary<TKey, TValue> dict)
+        {
+            dict.Clear();
+            _pool.Add(dict);
         }
     }
 }

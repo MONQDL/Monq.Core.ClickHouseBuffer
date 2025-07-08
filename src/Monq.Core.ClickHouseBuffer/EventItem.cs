@@ -1,54 +1,56 @@
-﻿using Monq.Core.ClickHouseBuffer.Extensions;
-using System.Collections.Generic;
-using System.Linq;
+using Monq.Core.ClickHouseBuffer.Schemas;
+using System;
 
-namespace Monq.Core.ClickHouseBuffer
+namespace Monq.Core.ClickHouseBuffer;
+
+/// <summary>
+/// Basic buffer event. It contains only tableName and column values ready for persisting.
+/// </summary>
+public class EventItem
 {
     /// <summary>
-    /// Buffer event.
+    /// Basic buffer event constructor.
     /// </summary>
-    public struct EventItem
+    /// <param name="tableName">Table name in ClickHouse.</param>
+    /// <param name="eventType">The type of the event, based on which the <see cref="Values"/> was created.</param>
+    /// <param name="values">Column values for recording an event in CH.</param>
+    public EventItem(string tableName, Type eventType, object?[] values)
     {
-        /// <summary>
-        /// The object of the event that you want to write to the database.
-        /// </summary>
-        public object Event { get; }
+        Key = new TypeTuple(eventType, tableName);
+        Values = values;
+    }
 
-        /// <summary>
-        /// Name of the table in which to write the event.
-        /// </summary>
-        public string TableName { get; }
+    /// <summary>
+    /// The key of the event base on table name and event type.
+    /// </summary>
+    public TypeTuple Key { get; }
 
-        /// <summary>
-        /// Flag indicating whether the event should be written to camelCase.
-        /// </summary>
-        public bool UseCamelCase { get; set; }
+    /// <summary>
+    /// Column values for recording an event in CH.
+    /// </summary>
+    public object?[] Values { get; }
+}
 
-        /// <summary>
-        /// The names of the columns for recording an event in CH.
-        /// </summary>
-        public IReadOnlyCollection<string> Columns { get; }
+/// <summary>
+/// The buffer event with the source event.
+/// </summary>
+public class EventItemWithSourceObject : EventItem
+{
+    /// <summary>
+    /// The source object of the event that you want to write to the storage.
+    /// </summary>
+    public object Source { get; }
 
-        /// <summary>
-        /// Column values for recording an event in CH.
-        /// </summary>
-        public IReadOnlyCollection<object> Values { get; }
-
-        /// <summary>
-        /// Buffer event constructor.
-        /// </summary>
-        /// <param name="event">Event object.</param>
-        /// <param name="tableName">Table name in ClickHouse.</param>
-        /// <param name="useCamelCase">Flag indicating whether the event should be written to camelCase </param>
-        public EventItem(object @event, string tableName, bool useCamelCase)
-        {
-            Event = @event;
-            TableName = tableName;
-            UseCamelCase = useCamelCase;
-
-            var dbValues = @event.CreateDbValues(UseCamelCase);
-            Columns = dbValues.Keys.Select(val => $"`{val}`").ToList().AsReadOnly();
-            Values = dbValues.Values.ToList().AsReadOnly();
-        }
+    /// <summary>
+    /// Buffer event constructor.
+    /// </summary>
+    /// <param name="event">Source object.</param>
+    /// <param name="tableName">Table name in ClickHouse.</param>
+    /// <param name="eventType">The type of the event, based on which the <paramref name="values"/> was created.</param>
+    /// <param name="values">Column values for recording an event in CH.</param>
+    public EventItemWithSourceObject(object @event, string tableName, Type eventType, object?[] values)
+        : base(tableName, eventType, values)
+    {
+        Source = @event;
     }
 }

@@ -1,19 +1,33 @@
-﻿using System.Threading.Tasks;
+using Monq.Core.ClickHouseBuffer.Attributes;
+using System.Diagnostics.CodeAnalysis;
+using System.Threading.Tasks;
 
-namespace Monq.Core.ClickHouseBuffer
+namespace Monq.Core.ClickHouseBuffer;
+
+/// <summary>
+/// Source storage buffer interface.
+/// </summary>
+public interface IEventsBufferEngine
 {
     /// <summary>
-    /// Event storage buffer interface.
+    /// Await the completion of the writing events.
     /// </summary>
-    public interface IEventsBufferEngine
-    {
-        /// <summary>
-        /// Add an event to record in ClickHouse.
-        /// </summary>
-        /// <param name="event">The object to be written to ClickHouse.</param>
-        /// <param name="tableName">Name of the table to write the event.</param>
-        /// <param name="useCamelCase">Flag indicating whether the event should be written to camelCase.</param>
-        /// <returns><see cref="Task"/>, showing completion of the operation.</returns>
-        Task AddEvent(object @event, string tableName, bool useCamelCase = true);
-    }
+    /// <returns></returns>
+    Task CompleteAsync();
+
+    /// <summary>
+    /// Add the event to the buffer. You must extract the property values yourself in the order defined by the schema or attribute <see cref="ClickHouseColumnAttribute"/>.
+    /// </summary>
+    /// <param name="item">The item with user-provided values array.</param>
+    void Add(EventItem item);
+
+    /// <summary>
+    /// Add the event to the buffer. The values and column names will be calculated based on ITableSchema schema if present
+    /// or based on attribute <see cref="ClickHouseColumnAttribute"/>.
+    /// </summary>
+    /// <typeparam name="T">The type of the event to save to the storage.</typeparam>
+    /// <param name="event">Source object to save to ClickHouse.</param>
+    /// <param name="tableName">ClickHouse table name to save to.</param>
+    void AddEvent<T>([NotNull] T @event, string tableName)
+        where T : class;
 }
