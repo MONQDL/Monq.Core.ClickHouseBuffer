@@ -6,6 +6,7 @@ using System;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
@@ -122,6 +123,8 @@ public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
     {
         List<EventItem>? errorEvents = null;
         List<EventItem>? completedEvents = null;
+        var sw = new Stopwatch();
+        sw.Start();
 
         try
         {
@@ -171,6 +174,9 @@ public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
         finally
         {
             ArrayPool<EventItem>.Shared.Return(array);
+
+            _log?.LogInformation("Buffer has written \"{RecordsCount}\" records to the database at {ElapsedMilliseconds} ms.",
+                count, sw.ElapsedMilliseconds);
         }
 
         try
@@ -194,8 +200,11 @@ public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
         }
     }
 
-    IEnumerable<GroupData> GroupByKey(ArraySegment<EventItem> batch)
+    static IEnumerable<GroupData> GroupByKey(ArraySegment<EventItem> batch)
     {
+        if (batch.Array is null)
+            yield break;
+
         var groups = DictionaryPool<TypeTuple, List<EventItem>>.Rent();
         try
         {
