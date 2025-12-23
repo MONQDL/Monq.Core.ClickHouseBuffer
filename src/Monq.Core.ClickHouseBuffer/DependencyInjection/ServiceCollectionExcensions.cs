@@ -1,5 +1,5 @@
-using ClickHouse.Client;
-using ClickHouse.Client.ADO;
+using ClickHouse.Driver;
+using ClickHouse.Driver.ADO;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -105,7 +105,7 @@ public static class ServiceCollectionExtensions
 #if NET8_0_OR_GREATER
             services.AddClickHouseDataSource(configuration.ConnectionString);
 #else
-        services.TryAddTransient<IClickHouseConnection>((s) => new ClickHouseConnection(configuration.ConnectionString));
+            services.TryAddTransient<IClickHouseConnection>((s) => new ClickHouseConnection(configuration.ConnectionString));
 #endif
         }
         services.TryAddTransient<IEventsWriter, DefaultClickHouseEventsWriter>();

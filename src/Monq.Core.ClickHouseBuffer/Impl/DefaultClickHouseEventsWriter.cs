@@ -1,6 +1,6 @@
-using ClickHouse.Client;
-using ClickHouse.Client.ADO;
-using ClickHouse.Client.Copy;
+using ClickHouse.Driver;
+using ClickHouse.Driver.ADO;
+using ClickHouse.Driver.Copy;
 using Monq.Core.ClickHouseBuffer.Schemas;
 using System;
 using System.Collections.Generic;

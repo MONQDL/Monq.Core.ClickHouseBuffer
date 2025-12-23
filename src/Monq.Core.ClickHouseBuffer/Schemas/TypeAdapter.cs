@@ -12,7 +12,7 @@ public static class TypeAdapter
     /// <param name="source">The source object.</param>
     /// <param name="tableName">The ClickHouse table name.</param>
     /// <returns>Array of objects that were calculated from <paramref name="source"/>.</returns>
-    public static object[] ClickHouseValues<TSource>(this TSource source, string tableName) => 
+    public static object[] ClickHouseValues<TSource>(this TSource source, string tableName) =>
         ClickHouseSchemaConfig.GlobalSettings.GetMappedValues(source, tableName);
 
     /// <summary>
@@ -22,7 +22,7 @@ public static class TypeAdapter
     /// <param name="source">The source object.</param>
     /// <param name="tableName">The ClickHouse table name.</param>
     /// <returns>Array of column names that were calculated from <paramref name="source"/>.</returns>
-    public static string[] ClickHouseColumns<TSource>(this TSource source, string tableName) => 
+    public static string[] ClickHouseColumns<TSource>(this TSource source, string tableName) =>
         ClickHouseSchemaConfig.GlobalSettings.GetMappedColumns(source, tableName);
 
     /// <summary>
