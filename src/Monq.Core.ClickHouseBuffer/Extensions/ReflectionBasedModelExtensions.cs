@@ -1,6 +1,7 @@
 using Monq.Core.ClickHouseBuffer.Attributes;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 
@@ -20,6 +21,7 @@ public static class ReflectionBasedModelExtensions
     /// </summary>
     /// <param name="obj">The object from which the column array will be extracted.</param>
     /// <returns></returns>
+    [RequiresUnreferencedCode("Uses reflection to extract property and field values")]
     public static object?[] ExtractDbColumnValues(this object? obj)
     {
         if (obj is null)
@@ -80,6 +82,7 @@ public static class ReflectionBasedModelExtensions
     /// </summary>
     /// <param name="obj">The object from which the column names array will be extracted.</param>
     /// <returns></returns>
+    [RequiresUnreferencedCode("Uses reflection to extract property and field names")]
     public static IReadOnlyList<string> ExtractDbColumnNames(this object? obj)
     {
         if (obj is null)
@@ -106,6 +109,7 @@ public static class ReflectionBasedModelExtensions
     /// <param name="event">The source event, which will be saved until it persists.</param>
     /// <param name="tableName">Table name in ClickHouse.</param>
     /// <returns></returns>
+    [RequiresUnreferencedCode("Uses reflection to extract property and field values")]
     public static EventItemWithSourceObject CreateFromReflectionWithSource(this object @event, string tableName)
     {
         var dbValues = @event.ExtractDbColumnValues();
@@ -119,6 +123,7 @@ public static class ReflectionBasedModelExtensions
     /// <param name="event">The source event, which will be saved until it persists.</param>
     /// <param name="tableName">Table name in ClickHouse.</param>
     /// <returns></returns>
+    [RequiresUnreferencedCode("Uses reflection to extract property and field values")]
     public static EventItem CreateFromReflection(this object @event, string tableName)
     {
         var dbValues = @event.ExtractDbColumnValues();

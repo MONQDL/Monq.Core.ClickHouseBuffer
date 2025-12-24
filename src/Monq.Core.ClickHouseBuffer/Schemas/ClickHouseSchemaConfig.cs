@@ -13,7 +13,7 @@ public class ClickHouseSchemaConfig
 {
     readonly ConcurrentDictionary<TypeTuple, TypeAdapterSettings> _rulesMap = new ConcurrentDictionary<TypeTuple, TypeAdapterSettings>();
     readonly ConcurrentDictionary<TypeTuple, string[]> _columnsMap = new ConcurrentDictionary<TypeTuple, string[]>();
-    
+
     public static ClickHouseSchemaConfig GlobalSettings { get; } = new ClickHouseSchemaConfig();
     public ConcurrentDictionary<TypeTuple, TypeAdapterSettings> RulesMap { get => _rulesMap; }
 
