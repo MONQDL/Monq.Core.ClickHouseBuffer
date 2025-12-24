@@ -1,7 +1,9 @@
+using Monq.Core.ClickHouseBuffer.Exceptions;
 using Monq.Core.ClickHouseBuffer.Extensions;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 
@@ -9,12 +11,11 @@ namespace Monq.Core.ClickHouseBuffer.Schemas;
 
 public class ClickHouseSchemaConfig
 {
+    readonly ConcurrentDictionary<TypeTuple, TypeAdapterSettings> _rulesMap = new ConcurrentDictionary<TypeTuple, TypeAdapterSettings>();
+    readonly ConcurrentDictionary<TypeTuple, string[]> _columnsMap = new ConcurrentDictionary<TypeTuple, string[]>();
+    
     public static ClickHouseSchemaConfig GlobalSettings { get; } = new ClickHouseSchemaConfig();
-
-    ConcurrentDictionary<TypeTuple, TypeAdapterSettings> _rulesMap = new ConcurrentDictionary<TypeTuple, TypeAdapterSettings>();
     public ConcurrentDictionary<TypeTuple, TypeAdapterSettings> RulesMap { get => _rulesMap; }
-
-    ConcurrentDictionary<TypeTuple, string[]> _columnsMap = new ConcurrentDictionary<TypeTuple, string[]>();
 
     public TypeAdapterSetter<TSource> NewConfig<TSource>(string tableName)
     {
@@ -50,7 +51,7 @@ public class ClickHouseSchemaConfig
                 .ToArray();
         }
         else
-            throw new Exception($"The type map \"{sourceType.Name}\" to \"{tableName}\" was not found");
+            throw new BufferConfigurationException($"The type map '{sourceType.Name}' to '{tableName}' was not found");
     }
 
     public bool SchemaExists<TSource>(string tableName) =>
@@ -69,7 +70,7 @@ public class ClickHouseSchemaConfig
         return _columnsMap.GetOrAdd(key, static (k, rules) =>
         {
             if (!rules.TryGetValue(k, out var settings))
-                throw new Exception($"The type map \"{k.Source.Name}\" to \"{k.TableName}\" was not found");
+                throw new BufferConfigurationException($"The type map '{k.Source.Name}' to '{k.TableName}' was not found");
 
             return settings.Resolvers.Select(x => x.ColumnName).ToArray();
         }, _rulesMap);
@@ -80,6 +81,7 @@ public class ClickHouseSchemaConfig
     /// </summary>
     /// <param name="assemblies">Assemblies to scan.</param>
     /// <returns>A list of registered mappings</returns>
+    [RequiresUnreferencedCode("assembly.GetLoadableTypes() requires unreferenced code")]
     public IList<ITableSchema> Scan(params Assembly[] assemblies)
     {
         var registers = assemblies.Select(assembly => assembly.GetLoadableTypes()

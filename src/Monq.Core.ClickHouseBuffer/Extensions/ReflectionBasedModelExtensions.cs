@@ -11,7 +11,7 @@ namespace Monq.Core.ClickHouseBuffer.Extensions;
 /// </summary>
 public static class ReflectionBasedModelExtensions
 {
-    const BindingFlags _flags = BindingFlags.Public |
+    const BindingFlags Flags = BindingFlags.Public |
                               BindingFlags.NonPublic |
                               BindingFlags.Instance;
 
@@ -30,7 +30,7 @@ public static class ReflectionBasedModelExtensions
         var objType = obj.GetType();
 
         var members = objType
-        .GetMembers(_flags)
+        .GetMembers(Flags)
         .Where(m => m.MemberType is MemberTypes.Property or MemberTypes.Field)
         .Select(m => new
         {
@@ -88,7 +88,7 @@ public static class ReflectionBasedModelExtensions
         var objType = obj.GetType();
 
         return objType
-            .GetMembers(_flags)
+            .GetMembers(Flags)
             .Where(m => m.MemberType is MemberTypes.Property or MemberTypes.Field)
             .Select(m => new
             {
