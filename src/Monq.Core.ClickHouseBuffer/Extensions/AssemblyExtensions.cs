@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 
@@ -15,6 +16,7 @@ public static class AssemblyExtensions
     /// </summary>
     /// <param name="assembly">The assembly from which the ITableSchema interfaces are searched.</param>
     /// <returns></returns>
+    [RequiresUnreferencedCode("assembly.GetTypes() requires unreferenced code")]
     public static IEnumerable<Type> GetLoadableTypes(this Assembly assembly)
     {
         try

@@ -1,5 +1,5 @@
-using ClickHouse.Client;
-using ClickHouse.Client.ADO;
+using ClickHouse.Driver;
+using ClickHouse.Driver.ADO;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Monq.Core.ClickHouseBuffer.Impl;
 using System;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Monq.Core.ClickHouseBuffer.DependencyInjection;
 
@@ -21,6 +22,7 @@ public static class ServiceCollectionExtensions
     /// <param name="services">Service collection.</param>
     /// <param name="configuration">IConfiguration section with engine options, configured.</param>
     /// <returns></returns>
+    [RequiresUnreferencedCode("Configuration binding requires unreferenced code")]
     public static IServiceCollection ConfigureCHBuffer(
         this IServiceCollection services,
         IConfiguration configuration)
@@ -58,6 +60,7 @@ public static class ServiceCollectionExtensions
     /// <param name="configuration">IConfiguration section with engine options, configured.</param>
     /// <param name="options">The action that can be used to configure ClickHouseBuffer.</param>
     /// <returns></returns>
+    [RequiresUnreferencedCode("Configuration binding requires unreferenced code")]
     public static IServiceCollection ConfigureCHBuffer(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -105,7 +108,7 @@ public static class ServiceCollectionExtensions
 #if NET8_0_OR_GREATER
             services.AddClickHouseDataSource(configuration.ConnectionString);
 #else
-        services.TryAddTransient<IClickHouseConnection>((s) => new ClickHouseConnection(configuration.ConnectionString));
+            services.TryAddTransient<IClickHouseConnection>((s) => new ClickHouseConnection(configuration.ConnectionString));
 #endif
         }
         services.TryAddTransient<IEventsWriter, DefaultClickHouseEventsWriter>();

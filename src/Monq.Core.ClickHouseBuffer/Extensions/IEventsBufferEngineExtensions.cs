@@ -23,6 +23,7 @@ public static class IEventsBufferEngineExtensions
     /// <param name="buffer">The <see cref="IEventsBufferEngine"/> object.</param>
     /// <param name="event">Source object to save to ClickHouse.</param>
     /// <param name="tableName">ClickHouse table name to save to.</param>
+    [RequiresUnreferencedCode("Uses reflection to extract property and field values")]
     public static void AddEventWithSourceObject<TSource>(this IEventsBufferEngine buffer, [NotNull] TSource @event, string tableName)
         where TSource : class
     {

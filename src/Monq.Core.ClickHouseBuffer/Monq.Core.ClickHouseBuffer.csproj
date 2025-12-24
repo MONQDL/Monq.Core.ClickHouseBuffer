@@ -1,11 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Version>3.0.1</Version>
+    <Version>3.1.0</Version>
     <VersionSuffix>$(VersionSuffix)</VersionSuffix>
     <Version Condition=" '$(VersionSuffix)' != '' ">$(Version)-$(VersionSuffix)</Version>
+    <TargetFrameworks>net6.0;net7.0;net8.0;net9.0;net10.0</TargetFrameworks>
     <IsPackable>true</IsPackable>
-    <TargetFrameworks>net6.0;net7.0;net8.0;net9.0</TargetFrameworks>
+    <IsTrimmable>true</IsTrimmable>
     <Authors>Sergey Pismennyi</Authors>
     <Company>MONQ Digital lab</Company>
     <Title>ClickHouseBuffer</Title>
@@ -20,10 +21,11 @@
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <Nullable>enable</Nullable>
+    <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="ClickHouse.Client" Version="7.14.0" />
+    <PackageReference Include="ClickHouse.Driver" Version="0.9.0" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
   </ItemGroup>
 

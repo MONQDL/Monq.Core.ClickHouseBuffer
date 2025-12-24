@@ -1,6 +1,5 @@
 using Monq.Core.ClickHouseBuffer.Attributes;
 using Monq.Core.ClickHouseBuffer.Extensions;
-using System;
 using Xunit;
 
 namespace Monq.Core.ClickHouseBuffer.Tests;

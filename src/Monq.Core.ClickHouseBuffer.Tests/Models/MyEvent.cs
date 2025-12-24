@@ -1,5 +1,3 @@
-using System;
-
 namespace Monq.Core.ClickHouseBuffer.Tests.Models;
 
 class MyEvent
