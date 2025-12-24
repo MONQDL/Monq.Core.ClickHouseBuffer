@@ -28,6 +28,7 @@ public interface IEventsBufferEngine
     /// <typeparam name="T">The type of the event to save to the storage.</typeparam>
     /// <param name="event">Source object to save to ClickHouse.</param>
     /// <param name="tableName">ClickHouse table name to save to.</param>
+    [RequiresUnreferencedCode("Uses reflection to extract property and field values")]
     void AddEvent<T>([NotNull] T @event, string tableName)
         where T : class;
 }

@@ -30,9 +30,9 @@ public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
     int _count;
     Task _currentFlushTask = Task.CompletedTask;
 
-    const string _errorWhileWritingEvents = "There was an error while writing events. Details: {ErrorMessage}";
-    const string _errorOnAfterWriteEvents = "There was an error execution OnAfterWriteEvents method. Details: {ErrorMessage}";
-    const string _errorOnWriteErrors = "There was an error execution OnWriteErrors method. Details: {ErrorMessage}";
+    const string ErrorWhileWritingEvents = "There was an error while writing events. Details: {ErrorMessage}";
+    const string ErrorOnAfterWriteEvents = "There was an error execution OnAfterWriteEvents method. Details: {ErrorMessage}";
+    const string ErrorOnWriteErrors = "There was an error execution OnWriteErrors method. Details: {ErrorMessage}";
 
     /// <summary>
     /// The implementation constructor of the event storage buffer.
@@ -69,6 +69,7 @@ public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
     }
 
     /// <inheritdoc />
+    [RequiresUnreferencedCode("Uses reflection to extract property and field values")]
     public void AddEvent<TSource>([NotNull] TSource @event, string tableName)
         where TSource : class
     {
@@ -159,7 +160,7 @@ public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
                     errorEvents ??= new List<EventItem>();
                     foreach (var innerEx in task.Exception.InnerExceptions)
                     {
-                        _log?.LogError(innerEx, _errorWhileWritingEvents, innerEx.Message);
+                        _log?.LogError(innerEx, ErrorWhileWritingEvents, innerEx.Message);
                         // Log exception
                         errorEvents.AddRange(eventsGroup);
                     }
@@ -186,7 +187,7 @@ public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
         }
         catch (Exception e)
         {
-            _log?.LogError(e, _errorOnAfterWriteEvents, e.Message);
+            _log?.LogError(e, ErrorOnAfterWriteEvents, e.Message);
         }
 
         try
@@ -196,7 +197,7 @@ public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
         }
         catch (Exception e)
         {
-            _log?.LogError(e, _errorOnWriteErrors, e.Message);
+            _log?.LogError(e, ErrorOnWriteErrors, e.Message);
         }
     }
 
