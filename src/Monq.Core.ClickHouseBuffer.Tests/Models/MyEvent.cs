@@ -8,9 +8,14 @@ class MyEvent
 
     public DateTimeOffset AggregatedAt { get; init; }
 
-    public long UserspaceId { get; init; }
+    public long? UserspaceId { get; init; }
 
     public string Value { get; init; }
 
     public TestEnum? EnumValue { get; set; } = TestEnum.Value;
+}
+
+class MyChildEvent : MyEvent
+{
+
 }
