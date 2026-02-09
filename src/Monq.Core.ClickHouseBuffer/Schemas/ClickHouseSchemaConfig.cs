@@ -28,7 +28,7 @@ public class ClickHouseSchemaConfig
         return new TypeAdapterSetter<TSource>(newSettings, this);
     }
 
-    public object[] GetMappedValues<TSource>(TSource? source, string tableName)
+    public object?[] GetMappedValues<TSource>(TSource? source, string tableName)
     {
         if (source is null)
             return Array.Empty<object>();
@@ -41,8 +41,20 @@ public class ClickHouseSchemaConfig
                 .Resolvers
                 .Select(x =>
                 {
-                    var fn = (Func<TSource, object>)x.Invoker!;
-                    var result = fn(source);
+                    object? result;
+                    // Convert Invoker to Func<TSource, object>, if possible
+                    if (x.Invoker is Func<TSource, object> typedInvoker)
+                    {
+                        result = typedInvoker(source);
+                    }
+                    else
+                    {
+                        // If the type does not match, we try to use a dynamic call
+                        // It may not be safe when trimming, but in this case
+                        // we assume that the types are compatible
+                        result = x.Invoker!.DynamicInvoke(source);
+                    }
+
                     if (x.PropertyType == typeof(string) && result == null)
                         return string.Empty;
                     else

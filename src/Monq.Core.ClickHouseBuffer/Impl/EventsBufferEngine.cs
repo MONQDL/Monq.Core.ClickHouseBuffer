@@ -274,10 +274,10 @@ public sealed class EventsBufferEngine : IEventsBufferEngine, IDisposable
         public static List<T> Rent() => _pool.Get();
         public static void Return(List<T> list) => _pool.Return(list);
 
-        class ListPolicy<T> : PooledObjectPolicy<List<T>>
+        class ListPolicy<R> : PooledObjectPolicy<List<R>>
         {
-            public override List<T> Create() => new List<T>();
-            public override bool Return(List<T> list)
+            public override List<R> Create() => new List<R>();
+            public override bool Return(List<R> list)
             {
                 list.Clear();
                 return true;
