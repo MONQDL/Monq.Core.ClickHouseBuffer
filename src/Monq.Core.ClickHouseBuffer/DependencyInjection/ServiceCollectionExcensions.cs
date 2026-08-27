@@ -27,12 +27,7 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var cfg = new EngineOptions();
-
-        configuration.Bind(cfg);
-        services.ConfigureCHBufferCore(cfg);
-
-        return services;
+        return services.ConfigureCHBufferCore(options => configuration.Bind(options));
     }
 
     /// <summary>
@@ -45,12 +40,7 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         Action<EngineOptions> options)
     {
-        var cfg = new EngineOptions();
-
-        options(cfg);
-        services.ConfigureCHBufferCore(cfg);
-
-        return services;
+        return services.ConfigureCHBufferCore(options);
     }
 
     /// <summary>
@@ -66,13 +56,11 @@ public static class ServiceCollectionExtensions
         IConfiguration configuration,
         Action<EngineOptions> options)
     {
-        var cfg = new EngineOptions();
-
-        configuration.Bind(cfg);
-        options(cfg);
-        services.ConfigureCHBufferCore(cfg);
-
-        return services;
+        return services.ConfigureCHBufferCore(engineOptions =>
+        {
+            configuration.Bind(engineOptions);
+            options(engineOptions);
+        });
     }
 
     /// <summary>
@@ -85,23 +73,19 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         string connectionString)
     {
-        var cfg = new EngineOptions()
-        {
-            ConnectionString = connectionString
-        };
-
-        services.ConfigureCHBufferCore(cfg);
-
-        return services;
+        return services.ConfigureCHBufferCore(options => options.ConnectionString = connectionString);
     }
 
     static IServiceCollection ConfigureCHBufferCore(
         this IServiceCollection services,
-        EngineOptions configuration)
+        Action<EngineOptions> configureOptions)
     {
-        services.AddOptions();
+        var configuration = new EngineOptions();
+        configureOptions(configuration);
 
-        services.TryAddSingleton(configuration);
+        services.AddOptions<EngineOptions>()
+            .Configure(configureOptions);
+        services.TryAddSingleton(sp => sp.GetRequiredService<IOptions<EngineOptions>>().Value);
 
         if (!string.IsNullOrEmpty(configuration.ConnectionString))
         {
@@ -115,11 +99,11 @@ public static class ServiceCollectionExtensions
         // Must be singleton.
         services.AddSingleton<IEventsBufferEngine, EventsBufferEngine>(sp =>
         {
-            var options = sp.GetRequiredService<IOptions<EngineOptions>>();
+            var options = sp.GetRequiredService<IOptions<EngineOptions>>().Value;
 
             return new EventsBufferEngine(sp.GetRequiredService<IEventsWriter>(),
-                options?.Value?.EventsFlushCount ?? 10000,
-                TimeSpan.FromSeconds(options?.Value?.EventsFlushPeriodSec ?? 2),
+                options.EventsFlushCount,
+                TimeSpan.FromSeconds(options.EventsFlushPeriodSec),
                 sp.GetService<IEventsHandler>(),
                 sp.GetService<ILogger<EventsBufferEngine>>());
         });
